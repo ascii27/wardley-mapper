@@ -26,6 +26,13 @@
     <h2 class="text-2xl">Dashboard</h2>
     <p id="welcome"></p>
     <button id="logout" class="bg-red-500 text-white px-2">Logout</button>
+    <div class="space-y-2 border-t pt-4">
+      <h3 class="text-xl font-semibold">Generate Map from Prompt</h3>
+      <textarea id="mapPrompt" class="w-full border p-2" rows="3" placeholder="Describe the system or problem space..."></textarea>
+      <button id="generateMap" class="bg-indigo-600 text-white px-3 py-1">Generate</button>
+      <div id="genStatus" class="text-sm text-gray-600"></div>
+      <canvas id="mapCanvas" width="800" height="400" class="border"></canvas>
+    </div>
   </div>
   <script>
     // Use same-origin API when served by Express
@@ -87,6 +94,73 @@
       document.getElementById('auth').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
     }
+
+    document.getElementById('generateMap').addEventListener('click', async () => {
+      const prompt = document.getElementById('mapPrompt').value.trim();
+      if (!prompt) return;
+      const status = document.getElementById('genStatus');
+      status.textContent = 'Generating...';
+      try {
+        const res = await fetch(API + '/ai/generate-map', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+          },
+          body: JSON.stringify({ prompt })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        status.textContent = `Map generated: ${data.name || ''}`;
+        renderMap(data.components || [], data.links || []);
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    function renderMap(components, links) {
+      const canvas = document.getElementById('mapCanvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // axes
+      ctx.strokeStyle = '#888';
+      ctx.beginPath();
+      ctx.moveTo(40, 10); ctx.lineTo(40, h-30); // y axis
+      ctx.lineTo(w-10, h-30); // x axis
+      ctx.stroke();
+      ctx.fillStyle = '#444';
+      ctx.fillText('Visibility ↑', 5, 20);
+      ctx.fillText('Evolution →', w-110, h-10);
+
+      // map to canvas space
+      const x0 = 40, y0 = h-30, x1 = w-10, y1 = 10;
+      const toX = (evolution) => x0 + (x1 - x0) * clamp01(evolution);
+      const toY = (visibility) => y0 - (y0 - y1) * clamp01(visibility);
+
+      // Draw links first
+      ctx.strokeStyle = '#aaa';
+      for (const l of links) {
+        const from = components.find(c => c.id === l.source_component_id) || components.find(c => c.name === l.from);
+        const to = components.find(c => c.id === l.target_component_id) || components.find(c => c.name === l.to);
+        if (!from || !to) continue;
+        const fx = toX(from.evolution), fy = toY(from.visibility);
+        const tx = toX(to.evolution), ty = toY(to.visibility);
+        ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty); ctx.stroke();
+      }
+
+      // Draw components
+      for (const c of components) {
+        const x = toX(c.evolution), y = toY(c.visibility);
+        ctx.fillStyle = '#2563eb';
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.fillText(c.name, x + 6, y - 6);
+      }
+    }
+
+    function clamp01(v){ const n = Number(v); if (Number.isNaN(n)) return 0.5; return Math.max(0, Math.min(1, n)); }
   </script>
 </body>
 </html>

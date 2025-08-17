@@ -30,6 +30,11 @@
 - Scope PRs narrowly; update docs in `README.md` or `intents/` when behavior or plans change.
 
 ## Security & Configuration Tips
-- Required env vars (set in `backend/.env`): `DATABASE_URL`, `DB_USER`, `JWT_SECRET`. `DB_PASSWORD` is optional and may be empty.
+- Required env vars (set in `backend/.env`): `DATABASE_URL`, `DB_USER`, `JWT_SECRET`, `OPENAI_API_KEY`. `DB_PASSWORD` is optional and may be empty.
 - No in-memory DB fallback; Postgres must be reachable.
 - Never log secrets; validate input and authenticate via the `Authorization: Bearer <token>` pattern.
+
+## Phase 2 Notes
+- API: `POST /ai/generate-map` expects `{ prompt }`, uses OpenAI with a strict JSON system prompt, validates and saves output.
+- Schema additions: `maps.prompt`, component coordinates (`evolution`, `visibility`), and a `links` table.
+- Frontend: Adds a prompt textarea in the dashboard and renders a simple canvas map.

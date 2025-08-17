@@ -11,6 +11,7 @@ Simple Wardley mapping application with Node.js backend and static frontend.
   - `DB_USER` PostgreSQL username.
   - `DB_PASSWORD` PostgreSQL password (optional; may be empty for local trust auth).
   - `JWT_SECRET` for signing tokens.
+  - `OPENAI_API_KEY` for Phase 2 AI map generation.
   - See `backend/.env.example` and create `backend/.env`.
 - Initialize the database tables:
 
@@ -32,3 +33,8 @@ Visit http://localhost:3000 to use the app (Express serves the `frontend/` direc
 
 - Served by the Express server from `frontend/`.
 - The client makes same-origin API calls; no separate static hosting is needed.
+
+## Phase 2: AI Map Generation
+- Endpoint: `POST /ai/generate-map` (auth required) with `{ "prompt": "..." }`.
+- Returns: `{ id, name, components:[{ name, evolution, visibility }], links:[{ from, to }] }` and persists to DB.
+- Requires `OPENAI_API_KEY` to be set. The server validates AI output and saves components with coordinates and links.
