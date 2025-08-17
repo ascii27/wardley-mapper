@@ -43,3 +43,8 @@
 - Interactive canvas: select and drag components to update positions (saves on mouseup).
 - Editing: add/delete components; link mode to create links via two clicks; list to delete links.
 - API added: `POST /maps/:id/components`, `PATCH /maps/:id/components/:componentId`, `DELETE /maps/:id/components/:componentId`, `POST /maps/:id/links`, `DELETE /maps/:id/links/:linkId`.
+
+## Phase 4 Notes
+- Chat: `GET /maps/:id/chat` returns messages for the user+map session; `POST /maps/:id/chat` sends a user message.
+- Context: backend includes map state and recent messages; model returns a reply and optional structured commands.
+- Commands supported: add/move/delete components; add/delete links. Commands are applied transactionally, then returned.

@@ -80,4 +80,62 @@ function clamp01(v) {
 }
 
 module.exports = { generateMapFromPrompt };
+// Phase 4 chat utilities
+const CHAT_SYSTEM_PROMPT = `You are a Wardley mapping copilot. Respond with STRICT JSON only:
+{
+  "reply": "<1-3 concise sentences>",
+  "commands": [
+    // zero or more operations to modify the map
+    { "op": "add_component", "name": "<string>", "evolution": <0..1>, "visibility": <0..1> },
+    { "op": "move_component", "name": "<string>", "evolution": <0..1>, "visibility": <0..1> },
+    { "op": "delete_component", "name": "<string>" },
+    { "op": "add_link", "from": "<string>", "to": "<string>" },
+    { "op": "delete_link", "from": "<string>", "to": "<string>" }
+  ]
+}
+Rules:
+- Only include commands when explicitly requested or clearly implied by the user.
+- Never include text outside JSON.
+- Keep names consistent with provided components.
+`;
 
+async function chatOnMap({ prompt, map, history, fetchImpl = fetch }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('Missing OPENAI_API_KEY');
+
+  const context = {
+    map: {
+      id: map.id,
+      name: map.name,
+      components: map.components.map(c => ({ name: c.name, evolution: c.evolution, visibility: c.visibility })),
+      links: map.links.map(l => ({ from: l.fromName || l.from, to: l.toName || l.to }))
+    },
+    instructions: 'Advise on Wardley mapping and optionally propose changes using commands.'
+  };
+
+  const messages = [
+    { role: 'system', content: CHAT_SYSTEM_PROMPT },
+    { role: 'system', content: 'CONTEXT:' + JSON.stringify(context) },
+    ...history.map(m => ({ role: m.role, content: m.content })),
+    { role: 'user', content: prompt }
+  ];
+
+  const body = { model: 'gpt-4o-mini', messages, temperature: 0.2 };
+  const resp = await fetchImpl('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`OpenAI error: ${resp.status} ${txt}`);
+  }
+  const data = await resp.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  const parsed = extractJson(content);
+  if (!parsed.reply) parsed.reply = '';
+  if (!Array.isArray(parsed.commands)) parsed.commands = [];
+  // sanitize commands
+  parsed.commands = parsed.commands.filter(cmd => typeof cmd === 'object' && typeof cmd.op === 'string');
+  return parsed;
+}
+
+module.exports.chatOnMap = chatOnMap;
