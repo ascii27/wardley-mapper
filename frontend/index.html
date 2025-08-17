@@ -20,7 +20,21 @@
     </div>
   </header>
   <main class="container px-4 py-4">
-    <div id="auth" class="space-y-4">
+    <div id="auth" class="space-y-6">
+      <div class="card p-4">
+        <h2 class="text-xl font-semibold mb-2">Understand, Strategize, Decide — with Wardley Maps</h2>
+        <div class="prose">
+          <p>Wardley maps visualize your landscape: users, components, dependencies, and evolution. Use them to spot inertia, guide investment, and make confident decisions.</p>
+          <ul class="list-disc pl-5">
+            <li>Describe a system to generate a first map.</li>
+            <li>Drag components to refine positions and links.</li>
+            <li>Chat with AI for analysis and next steps.</li>
+          </ul>
+          <p>Learn more: <a class="text-blue-600 underline" href="https://wardleymaps.com/" target="_blank" rel="noopener">wardleymaps.com</a> ·
+          <a class="text-blue-600 underline" href="https://www.youtube.com/results?search_query=wardley+maps" target="_blank" rel="noopener">YouTube talks</a> ·
+          <a class="text-blue-600 underline" href="https://leadingedgeforum.com/research/wardley-maps/" target="_blank" rel="noopener">LEF intro</a></p>
+        </div>
+      </div>
       <div class="grid md:grid-cols-2 gap-6">
         <form id="signupForm" class="space-y-3 card p-4">
           <h2 class="text-xl">Sign Up</h2>
@@ -46,6 +60,7 @@
         <input id="mapSearch" class="border p-2 rounded w-full mb-2" placeholder="Search maps..." />
         <ul id="mapsList" class="map-list"></ul>
         <hr class="my-4" />
+        <button id="guidesBtn" class="btn btn-tonal w-full mb-2"><span class="material-symbols-outlined">menu_book</span>Guides</button>
         <button id="profileBtn" class="btn btn-tonal w-full mb-2"><span class="material-symbols-outlined">account_circle</span>Profile</button>
         <button id="logoutSidebar" class="btn btn-tonal w-full"><span class="material-symbols-outlined">logout</span>Logout</button>
       </aside>
@@ -88,6 +103,29 @@
               <button id="sendChat" class="btn btn-primary"><span class="material-symbols-outlined">send</span>Send</button>
             </div>
             <div id="chatStatus" class="text-sm text-gray-600 mt-1"></div>
+          </div>
+        </div>
+        <div id="guidesView" class="hidden card p-4">
+          <h3 class="text-xl font-semibold mb-2">Guides: Wardley Mapping</h3>
+          <div class="prose">
+            <h4>What is a Wardley Map?</h4>
+            <p>A Wardley Map is a visual model of a system showing the value chain (Y axis: visibility to users) and evolution (X axis: from genesis to commodity). It helps you reason about strategy and movement.</p>
+            <h4>How to Create</h4>
+            <ul class="list-disc pl-5">
+              <li>Define users and their needs (top of value chain).</li>
+              <li>List components that fulfill those needs.</li>
+              <li>Place components by evolution (X) and visibility (Y).</li>
+              <li>Connect components to show dependencies.</li>
+            </ul>
+            <h4>How to Use</h4>
+            <ul class="list-disc pl-5">
+              <li>Identify duplication, inertia, and opportunities.</li>
+              <li>Choose plays (e.g., build vs buy, open vs proprietary).</li>
+              <li>Track movement over time to inform decisions.</li>
+            </ul>
+            <p>Deep dives: <a class="text-blue-600 underline" href="https://wardleypedia.org/" target="_blank" rel="noopener">Wardleypedia</a> ·
+            <a class="text-blue-600 underline" href="https://www.youtube.com/results?search_query=wardley+maps" target="_blank" rel="noopener">YouTube</a> ·
+            <a class="text-blue-600 underline" href="https://medium.com/wardleymaps" target="_blank" rel="noopener">Wardley Maps on Medium</a></p>
           </div>
         </div>
       </section>
