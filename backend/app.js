@@ -104,8 +104,14 @@ app.post('/ai/generate-map', authenticateToken, async (req, res) => {
         }
       }
 
+      const linksWithIds = await client.query('SELECT id, source_component_id, target_component_id FROM links WHERE map_id=$1', [mapId]);
+      const comps = [];
+      for (const [name, compId] of componentIdByName.entries()) {
+        const c = mapData.components.find(x => x.name === name);
+        if (c) comps.push({ id: compId, name, evolution: c.evolution, visibility: c.visibility });
+      }
       await client.query('COMMIT');
-      res.json({ id: mapId, ...mapData });
+      res.json({ id: mapId, name: mapData.name || 'Generated Map', components: comps, links: linksWithIds.rows });
     } catch (inner) {
       await client.query('ROLLBACK');
       throw inner;
@@ -129,7 +135,7 @@ app.get('/maps/:id', authenticateToken, async (req, res) => {
   const map = await db.query('SELECT id, name, prompt FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
   if (!map.rows.length) return res.sendStatus(404);
   const components = await db.query('SELECT id, name, evolution, visibility FROM components WHERE map_id=$1', [id]);
-  const links = await db.query('SELECT source_component_id, target_component_id FROM links WHERE map_id=$1', [id]);
+  const links = await db.query('SELECT id, source_component_id, target_component_id FROM links WHERE map_id=$1', [id]);
   res.json({
     id: Number(id),
     name: map.rows[0].name,
@@ -138,6 +144,79 @@ app.get('/maps/:id', authenticateToken, async (req, res) => {
     links: links.rows,
   });
 });
+
+// Phase 3: Component CRUD
+app.post('/maps/:id/components', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { name, evolution = 0.5, visibility = 0.5 } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const map = await db.query('SELECT id FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
+  if (!map.rows.length) return res.sendStatus(404);
+  const ins = await db.query(
+    'INSERT INTO components (map_id, name, evolution, visibility) VALUES ($1, $2, $3, $4) RETURNING id, name, evolution, visibility',
+    [id, name, clamp01(evolution), clamp01(visibility)]
+  );
+  res.status(201).json(ins.rows[0]);
+});
+
+app.patch('/maps/:id/components/:componentId', authenticateToken, async (req, res) => {
+  const { id, componentId } = req.params;
+  const map = await db.query('SELECT id FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
+  if (!map.rows.length) return res.sendStatus(404);
+  const existing = await db.query('SELECT id FROM components WHERE id=$1 AND map_id=$2', [componentId, id]);
+  if (!existing.rows.length) return res.sendStatus(404);
+  const { name, evolution, visibility } = req.body || {};
+  const fields = [];
+  const values = [];
+  if (name !== undefined) { fields.push('name'); values.push(name); }
+  if (evolution !== undefined) { fields.push('evolution'); values.push(clamp01(evolution)); }
+  if (visibility !== undefined) { fields.push('visibility'); values.push(clamp01(visibility)); }
+  if (!fields.length) return res.status(400).json({ error: 'no fields to update' });
+  const setClause = fields.map((f, i) => `${f}=$${i+1}`).join(', ');
+  values.push(componentId);
+  const upd = await db.query(`UPDATE components SET ${setClause} WHERE id=$${values.length} RETURNING id, name, evolution, visibility`, values);
+  res.json(upd.rows[0]);
+});
+
+app.delete('/maps/:id/components/:componentId', authenticateToken, async (req, res) => {
+  const { id, componentId } = req.params;
+  const map = await db.query('SELECT id FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
+  if (!map.rows.length) return res.sendStatus(404);
+  await db.query('DELETE FROM links WHERE map_id=$1 AND (source_component_id=$2 OR target_component_id=$2)', [id, componentId]);
+  await db.query('DELETE FROM components WHERE id=$1 AND map_id=$2', [componentId, id]);
+  res.sendStatus(204);
+});
+
+// Phase 3: Link CRUD
+app.post('/maps/:id/links', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { sourceId, targetId } = req.body || {};
+  if (!sourceId || !targetId) return res.status(400).json({ error: 'sourceId and targetId required' });
+  const map = await db.query('SELECT id FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
+  if (!map.rows.length) return res.sendStatus(404);
+  const a = await db.query('SELECT id FROM components WHERE id=$1 AND map_id=$2', [sourceId, id]);
+  const b = await db.query('SELECT id FROM components WHERE id=$1 AND map_id=$2', [targetId, id]);
+  if (!a.rows.length || !b.rows.length) return res.status(400).json({ error: 'components must belong to map' });
+  const ins = await db.query(
+    'INSERT INTO links (map_id, source_component_id, target_component_id) VALUES ($1, $2, $3) RETURNING id, source_component_id, target_component_id',
+    [id, sourceId, targetId]
+  );
+  res.status(201).json(ins.rows[0]);
+});
+
+app.delete('/maps/:id/links/:linkId', authenticateToken, async (req, res) => {
+  const { id, linkId } = req.params;
+  const map = await db.query('SELECT id FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
+  if (!map.rows.length) return res.sendStatus(404);
+  await db.query('DELETE FROM links WHERE id=$1 AND map_id=$2', [linkId, id]);
+  res.sendStatus(204);
+});
+
+function clamp01(v) {
+  const n = Number(v);
+  if (Number.isNaN(n)) return 0.5;
+  return Math.max(0, Math.min(1, n));
+}
 
 // Serve the frontend index for the root path
 app.get('/', (req, res) => {

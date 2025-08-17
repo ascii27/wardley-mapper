@@ -38,3 +38,9 @@ Visit http://localhost:3000 to use the app (Express serves the `frontend/` direc
 - Endpoint: `POST /ai/generate-map` (auth required) with `{ "prompt": "..." }`.
 - Returns: `{ id, name, components:[{ name, evolution, visibility }], links:[{ from, to }] }` and persists to DB.
 - Requires `OPENAI_API_KEY` to be set. The server validates AI output and saves components with coordinates and links.
+
+## Phase 3: Interactive Editing
+- Canvas supports selecting and dragging components to update `evolution` and `visibility` (auto-saved).
+- Add components via the input + Add button; delete the selected component.
+- Link mode: toggle on, click source then target to create a link; delete links from the list under the canvas.
+- Endpoints used: `POST /maps/:id/components`, `PATCH /maps/:id/components/:componentId`, `DELETE /maps/:id/components/:componentId`, `POST /maps/:id/links`, `DELETE /maps/:id/links/:linkId`.
