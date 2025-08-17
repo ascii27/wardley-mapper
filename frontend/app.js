@@ -35,6 +35,10 @@ async function init() {
   $('logoutSidebar').addEventListener('click', logout);
   $('profileBtn').addEventListener('click', () => alert('Profile coming soon'));
   const guidesBtn = $('guidesBtn'); if (guidesBtn) guidesBtn.addEventListener('click', showGuides);
+  const collapseBtn = $('collapseSidebar'); if (collapseBtn) collapseBtn.addEventListener('click', () => {
+    const grid = document.querySelector('.app-grid');
+    if (grid) grid.classList.toggle('collapsed');
+  });
   $('newMapBtn').addEventListener('click', (e) => {
     e.stopPropagation();
     const menu = $('newMenu');
@@ -247,6 +251,7 @@ function renderMap() {
   // axes
   ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(40, 10); ctx.lineTo(40, h-30); ctx.lineTo(w-10, h-30); ctx.stroke();
   ctx.fillStyle = '#444';
+  ctx.font = '14px Roboto, Arial, sans-serif';
   ctx.fillText('Value Chain (Invisible → Visible)', 45, 20);
   ctx.fillText('Evolution', w/2 - 20, h - 10);
   const x0 = 40, y0 = h-30, x1 = w-10, y1 = 10;
@@ -305,7 +310,7 @@ function renderMap() {
     } else {
       ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2); ctx.fill();
     }
-    ctx.fillStyle = '#111'; ctx.fillText(c.name, x + 10, y - 8);
+    ctx.fillStyle = '#111'; ctx.font = '13px Roboto, Arial, sans-serif'; ctx.fillText(c.name, x + 10, y - 8);
   }
   // Links list UI
   const list = $('linksList'); if (list) {

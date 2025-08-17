@@ -55,12 +55,15 @@
       <aside class="sidebar card p-4">
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-lg font-semibold">Maps</h3>
-          <button id="newMapBtn" class="btn btn-primary"><span class="material-symbols-outlined">add</span>New</button>
+          <div class="flex gap-2">
+            <button id="collapseSidebar" class="btn btn-tonal" title="Collapse"><span class="material-symbols-outlined">chevron_left</span></button>
+            <button id="newMapBtn" class="btn btn-primary"><span class="material-symbols-outlined">add</span>New</button>
+          </div>
         </div>
         <div id="newMenu" class="hidden border rounded p-2 bg-white mb-2">
           <div class="flex flex-col gap-2">
             <button id="newWizard" class="btn btn-tonal w-full"><span class="material-symbols-outlined">auto_mode</span>Use Wizard</button>
-            <button id="newGenerator" class="btn btn-tonal w-full"><span class="material-symbols-outlined">sparkles</span>AI Generator</button>
+            <button id="newGenerator" class="btn btn-tonal w-full"><span class="material-symbols-outlined">auto_awesome</span>AI Generator</button>
             <button id="newBlank" class="btn btn-tonal w-full"><span class="material-symbols-outlined">post_add</span>Blank Map</button>
           </div>
         </div>
@@ -81,7 +84,7 @@
             <label class="font-semibold">Context</label>
             <textarea id="wizContext" class="w-full border p-2 rounded" rows="3" placeholder="Describe your users and problem space..."></textarea>
             <div class="flex gap-2">
-              <button id="wizAiUsers" class="btn btn-tonal"><span class="material-symbols-outlined">sparkles</span>AI: Suggest Users & Needs</button>
+              <button id="wizAiUsers" class="btn btn-tonal"><span class="material-symbols-outlined">auto_awesome</span>AI: Suggest Users & Needs</button>
             </div>
             <div class="grid md:grid-cols-2 gap-4">
               <div>

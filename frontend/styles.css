@@ -14,7 +14,7 @@
 }
 html, body { height: 100%; }
 body { background: var(--bg); font-family: Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif; color: var(--text); }
-.container { max-width: 1200px; margin: 0 auto; }
+.container { max-width: 100%; margin: 0 auto; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
 
 /* Buttons */
@@ -28,6 +28,7 @@ body { background: var(--bg); font-family: Roboto, system-ui, -apple-system, Seg
 
 /* App grid with sidebar */
 .app-grid { display: grid; grid-template-columns: 280px 1fr; gap: 16px; min-height: calc(100vh - 64px); }
+.app-grid.collapsed { grid-template-columns: 0 1fr; }
 .sidebar { height: calc(100vh - 128px); overflow: auto; }
 .map-list { list-style: none; padding: 0; margin: 0; }
 .map-list li { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
@@ -59,3 +60,9 @@ header.appbar { position: sticky; top: 0; z-index: 10; background: #ffffffcc; ba
 .prose p { margin: 6px 0; color: var(--text); }
 .prose ul { margin: 6px 0; }
 .prose a:hover { text-decoration-thickness: 2px; }
+
+/* Map fullscreen mode */
+body.map-expanded .sidebar { display: none; }
+body.map-expanded .main .card { display: none; }
+body.map-expanded .main .card:first-child { display: block; }
+body.map-expanded .container { max-width: 100%; padding-left: 8px; padding-right: 8px; }
