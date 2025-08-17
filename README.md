@@ -33,6 +33,10 @@ Visit http://localhost:3000 to use the app (Express serves the `frontend/` direc
 
 - Served by the Express server from `frontend/`.
 - The client makes same-origin API calls; no separate static hosting is needed.
+- Frontend assets:
+  - `frontend/index.html` (layout with sidebar + views)
+  - `frontend/app.js` (interactive logic, canvas, chat, map CRUD)
+  - `frontend/styles.css` (lightweight styles and layout)
 
 ## Phase 2: AI Map Generation
 - Endpoint: `POST /ai/generate-map` (auth required) with `{ "prompt": "..." }`.
