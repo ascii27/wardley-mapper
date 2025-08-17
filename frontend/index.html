@@ -57,6 +57,15 @@
         <ul id="linksList" class="list-disc pl-5 text-sm"></ul>
       </div>
     </div>
+    <div class="space-y-2 border-t pt-4">
+      <h3 class="text-xl font-semibold">AI Chat</h3>
+      <div id="chatLog" class="border p-2 h-64 overflow-y-auto bg-gray-50 text-sm"></div>
+      <div class="flex gap-2 mt-2">
+        <input id="chatInput" class="flex-1 border p-1" placeholder="Ask the AI about this map..." />
+        <button id="sendChat" class="bg-blue-600 text-white px-3">Send</button>
+      </div>
+      <div id="chatStatus" class="text-sm text-gray-600 mt-1"></div>
+    </div>
   </div>
   <script>
     // Use same-origin API when served by Express
@@ -108,6 +117,7 @@
     let selectedComponentId = null;
     let dragState = null;
     let pendingLinkSourceId = null;
+    let sessionId = null;
 
     document.getElementById('generateMap').addEventListener('click', async () => {
       const prompt = document.getElementById('mapPrompt').value.trim();
@@ -128,6 +138,7 @@
         links = (data.links || []).map((l) => ({ ...l }));
         populateMaps();
         renderMap();
+        await loadChat();
       } catch (e) { status.textContent = 'Error: ' + e.message; }
     });
 
@@ -164,6 +175,7 @@
       const res = await fetch(API + `/maps/${id}`, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
       const data = await res.json(); if (!res.ok) return;
       currentMapId = id; components = (data.components || []).map(c=>({ ...c })); links = (data.links || []).map(l=>({ ...l })); renderMap();
+      await loadChat();
     }
 
     function renderMap() {
@@ -260,6 +272,32 @@
       const toPixX = (e) => x0 + (x1 - x0) * clamp01(e); const toPixY = (v) => y0 - (y0 - y1) * clamp01(v);
       for (const c of components) { const cx = toPixX(c.evolution), cy = toPixY(c.visibility); const d2=(x-cx)*(x-cx)+(y-cy)*(y-cy); if (d2<=8*8) return c; }
       return null;
+    }
+
+    // Chat helpers
+    async function loadChat() {
+      if (!currentMapId) return;
+      const res = await fetch(API + `/maps/${currentMapId}/chat`, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
+      if (!res.ok) return;
+      const data = await res.json(); sessionId = data.sessionId;
+      const log = document.getElementById('chatLog'); log.innerHTML = '';
+      for (const m of data.messages) appendChat(m.role, m.content);
+    }
+    document.getElementById('sendChat').addEventListener('click', async () => {
+      const input = document.getElementById('chatInput'); const txt = input.value.trim(); if (!txt || !currentMapId) return;
+      appendChat('user', txt); input.value = ''; document.getElementById('chatStatus').textContent = 'Thinking...';
+      const res = await fetch(API + `/maps/${currentMapId}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') }, body: JSON.stringify({ message: txt }) });
+      const data = await res.json(); if (!res.ok) { document.getElementById('chatStatus').textContent = 'Error: ' + (data.error || 'chat failed'); return; }
+      document.getElementById('chatStatus').textContent = '';
+      appendChat('assistant', data.assistant || '');
+      if (Array.isArray(data.components)) components = data.components;
+      if (Array.isArray(data.links)) links = data.links;
+      renderMap();
+    });
+    function appendChat(role, content) {
+      const log = document.getElementById('chatLog'); const div = document.createElement('div');
+      div.className = role === 'assistant' ? 'mb-1 text-gray-800' : 'mb-1 text-gray-600';
+      div.textContent = `${role}: ${content}`; log.appendChild(div); log.scrollTop = log.scrollHeight;
     }
   </script>
 </body>

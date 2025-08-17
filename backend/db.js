@@ -65,6 +65,25 @@ async function initDb() {
       target_component_id INTEGER REFERENCES components(id)
     );
   `);
+
+  // Phase 4: chat sessions and messages
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      map_id INTEGER REFERENCES maps(id),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id SERIAL PRIMARY KEY,
+      session_id INTEGER REFERENCES chat_sessions(id),
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
 }
 
 module.exports = {

@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const db = require('./db');
 const { generateMapFromPrompt } = require('./ai');
+const { chatOnMap } = require('./ai');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -136,12 +137,19 @@ app.get('/maps/:id', authenticateToken, async (req, res) => {
   if (!map.rows.length) return res.sendStatus(404);
   const components = await db.query('SELECT id, name, evolution, visibility FROM components WHERE map_id=$1', [id]);
   const links = await db.query('SELECT id, source_component_id, target_component_id FROM links WHERE map_id=$1', [id]);
+  // link names for context convenience
+  const linkRows = [];
+  for (const l of links.rows) {
+    const from = components.rows.find(c => c.id === l.source_component_id);
+    const to = components.rows.find(c => c.id === l.target_component_id);
+    linkRows.push({ id: l.id, source_component_id: l.source_component_id, target_component_id: l.target_component_id, fromName: from?.name, toName: to?.name });
+  }
   res.json({
     id: Number(id),
     name: map.rows[0].name,
     prompt: map.rows[0].prompt,
     components: components.rows,
-    links: links.rows,
+    links: linkRows,
   });
 });
 
@@ -210,6 +218,120 @@ app.delete('/maps/:id/links/:linkId', authenticateToken, async (req, res) => {
   if (!map.rows.length) return res.sendStatus(404);
   await db.query('DELETE FROM links WHERE id=$1 AND map_id=$2', [linkId, id]);
   res.sendStatus(204);
+});
+
+// Phase 4: Chat
+async function getOrCreateSession(userId, mapId) {
+  const existing = await db.query('SELECT id FROM chat_sessions WHERE user_id=$1 AND map_id=$2 ORDER BY id DESC LIMIT 1', [userId, mapId]);
+  if (existing.rows.length) return existing.rows[0].id;
+  const ins = await db.query('INSERT INTO chat_sessions (user_id, map_id) VALUES ($1, $2) RETURNING id', [userId, mapId]);
+  return ins.rows[0].id;
+}
+
+app.get('/maps/:id/chat', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const map = await db.query('SELECT id FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
+  if (!map.rows.length) return res.sendStatus(404);
+  const sessionId = await getOrCreateSession(req.user.id, id);
+  const msgs = await db.query('SELECT id, role, content, created_at FROM chat_messages WHERE session_id=$1 ORDER BY id ASC', [sessionId]);
+  res.json({ sessionId, messages: msgs.rows });
+});
+
+app.post('/maps/:id/chat', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { message } = req.body || {};
+  if (!message) return res.status(400).json({ error: 'message is required' });
+  const mapRow = await db.query('SELECT id, name FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
+  if (!mapRow.rows.length) return res.sendStatus(404);
+  const sessionId = await getOrCreateSession(req.user.id, id);
+  await db.query('INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)', [sessionId, 'user', message]);
+
+  // Build map context
+  const components = await db.query('SELECT id, name, evolution, visibility FROM components WHERE map_id=$1', [id]);
+  const links = await db.query('SELECT id, source_component_id, target_component_id FROM links WHERE map_id=$1', [id]);
+  const linkRows = links.rows.map(l => ({
+    id: l.id,
+    from: components.rows.find(c => c.id === l.source_component_id)?.name,
+    to: components.rows.find(c => c.id === l.target_component_id)?.name,
+  })).filter(l => l.from && l.to);
+  const historyRows = await db.query('SELECT role, content FROM chat_messages WHERE session_id=$1 ORDER BY id DESC LIMIT 10', [sessionId]);
+  const history = historyRows.rows.reverse();
+
+  try {
+    const ai = await chatOnMap({
+      prompt: message,
+      map: { id: Number(id), name: mapRow.rows[0].name, components: components.rows, links: linkRows },
+      history
+    });
+
+    // Apply commands
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+      const nameToId = new Map(components.rows.map(c => [c.name, c.id]));
+      for (const cmd of ai.commands) {
+        switch (cmd.op) {
+          case 'add_component': {
+            if (typeof cmd.name === 'string') {
+              const ins = await client.query('INSERT INTO components (map_id, name, evolution, visibility) VALUES ($1,$2,$3,$4) RETURNING id', [id, cmd.name, clamp01(cmd.evolution), clamp01(cmd.visibility)]);
+              nameToId.set(cmd.name, ins.rows[0].id);
+            }
+            break;
+          }
+          case 'move_component': {
+            const cid = nameToId.get(cmd.name);
+            if (cid) await client.query('UPDATE components SET evolution=$1, visibility=$2 WHERE id=$3', [clamp01(cmd.evolution), clamp01(cmd.visibility), cid]);
+            break;
+          }
+          case 'delete_component': {
+            const cid = nameToId.get(cmd.name);
+            if (cid) {
+              await client.query('DELETE FROM links WHERE map_id=$1 AND (source_component_id=$2 OR target_component_id=$2)', [id, cid]);
+              await client.query('DELETE FROM components WHERE id=$1', [cid]);
+              nameToId.delete(cmd.name);
+            }
+            break;
+          }
+          case 'add_link': {
+            const fromId = nameToId.get(cmd.from);
+            const toId = nameToId.get(cmd.to);
+            if (fromId && toId) await client.query('INSERT INTO links (map_id, source_component_id, target_component_id) VALUES ($1,$2,$3)', [id, fromId, toId]);
+            break;
+          }
+          case 'delete_link': {
+            const fromId = nameToId.get(cmd.from);
+            const toId = nameToId.get(cmd.to);
+            if (fromId && toId) await client.query('DELETE FROM links WHERE map_id=$1 AND source_component_id=$2 AND target_component_id=$3', [id, fromId, toId]);
+            break;
+          }
+          default:
+            break;
+        }
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    // Save assistant message
+    await db.query('INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)', [sessionId, 'assistant', ai.reply]);
+
+    // Return updated map and the assistant reply
+    const comps2 = await db.query('SELECT id, name, evolution, visibility FROM components WHERE map_id=$1', [id]);
+    const links2 = await db.query('SELECT id, source_component_id, target_component_id FROM links WHERE map_id=$1', [id]);
+    res.json({
+      sessionId,
+      assistant: ai.reply,
+      components: comps2.rows,
+      links: links2.rows,
+    });
+  } catch (e) {
+    console.error('chat failed:', e);
+    res.status(500).json({ error: 'chat failed', details: e.message });
+  }
 });
 
 function clamp01(v) {
