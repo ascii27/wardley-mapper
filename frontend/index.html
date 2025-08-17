@@ -4,9 +4,88 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wardley Mapper</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-  <h1>Welcome to Wardley Mapper</h1>
-  <p>This is a placeholder dashboard.</p>
+<body class="p-4">
+  <div id="auth" class="space-y-4">
+    <h1 class="text-2xl font-bold">Wardley Mapper</h1>
+    <form id="signupForm" class="space-y-2">
+      <h2 class="text-xl">Sign Up</h2>
+      <input class="border p-1" type="text" id="signupUsername" placeholder="Username" required>
+      <input class="border p-1" type="password" id="signupPassword" placeholder="Password" required>
+      <button class="bg-blue-500 text-white px-2" type="submit">Sign Up</button>
+    </form>
+    <form id="loginForm" class="space-y-2">
+      <h2 class="text-xl">Login</h2>
+      <input class="border p-1" type="text" id="loginUsername" placeholder="Username" required>
+      <input class="border p-1" type="password" id="loginPassword" placeholder="Password" required>
+      <button class="bg-green-500 text-white px-2" type="submit">Login</button>
+    </form>
+  </div>
+  <div id="dashboard" class="hidden space-y-4">
+    <h2 class="text-2xl">Dashboard</h2>
+    <p id="welcome"></p>
+    <button id="logout" class="bg-red-500 text-white px-2">Logout</button>
+  </div>
+  <script>
+    const API = 'http://localhost:3000';
+    const token = localStorage.getItem('token');
+
+    if (token) showDashboard();
+
+    document.getElementById('signupForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const username = document.getElementById('signupUsername').value;
+      const password = document.getElementById('signupPassword').value;
+      const res = await fetch(API + '/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        showDashboard();
+      }
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      const res = await fetch(API + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        showDashboard();
+      }
+    });
+
+    document.getElementById('logout').addEventListener('click', async () => {
+      const token = localStorage.getItem('token');
+      await fetch(API + '/logout', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      localStorage.removeItem('token');
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('auth').classList.remove('hidden');
+    });
+
+    async function showDashboard() {
+      const token = localStorage.getItem('token');
+      const res = await fetch(API + '/dashboard', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const data = await res.json();
+      document.getElementById('welcome').innerText = data.message || 'Logged in';
+      document.getElementById('auth').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+    }
+  </script>
 </body>
 </html>
