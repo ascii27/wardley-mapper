@@ -1,0 +1,54 @@
+/* Base layout */
+:root {
+  --bg: #f7f7f8;
+  --card: #ffffff;
+  --border: #eaeaea;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --primary: #1e40af;
+  --primary-contrast: #ffffff;
+  --tonal-bg: #e8eaf6;
+  --tonal-fg: #1e40af;
+  --danger-bg: #fee2e2;
+  --danger-fg: #b91c1c;
+}
+html, body { height: 100%; }
+body { background: var(--bg); font-family: Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif; color: var(--text); }
+.container { max-width: 1200px; margin: 0 auto; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 8px 12px; border: none; cursor: pointer; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: var(--primary-contrast); }
+.btn-tonal { background: var(--tonal-bg); color: var(--tonal-fg); }
+.btn-danger { background: var(--danger-bg); color: var(--danger-fg); }
+.chip { background: #eef2ff; color: var(--tonal-fg); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+
+/* App grid with sidebar */
+.app-grid { display: grid; grid-template-columns: 280px 1fr; gap: 16px; min-height: calc(100vh - 64px); }
+.sidebar { height: calc(100vh - 128px); overflow: auto; }
+.map-list { list-style: none; padding: 0; margin: 0; }
+.map-list li { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.map-list li:hover { background: #f3f4f6; }
+.map-list .meta { color: var(--muted); font-size: 12px; }
+
+/* Utility */
+.hidden { display: none !important; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-4 { gap: 16px; }
+.p-2 { padding: 8px; }
+.p-3 { padding: 12px; }
+.p-4 { padding: 16px; }
+.px-4 { padding-left: 16px; padding-right: 16px; }
+.py-3 { padding-top: 12px; padding-bottom: 12px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.w-full { width: 100%; }
+.border { border: 1px solid var(--border); }
+.rounded { border-radius: 8px; }
+header.appbar { position: sticky; top: 0; z-index: 10; background: #ffffffcc; backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--border); }
+
