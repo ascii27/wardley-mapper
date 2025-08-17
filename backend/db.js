@@ -30,7 +30,8 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS maps (
       id SERIAL PRIMARY KEY,
       user_id INTEGER REFERENCES users(id),
-      name TEXT
+      name TEXT,
+      prompt TEXT
     );
   `);
 
@@ -41,9 +42,27 @@ async function initDb() {
       name TEXT
     );
   `);
+
+  // Phase 2: coordinates for components (Wardley axes: evolution=x, visibility=y)
+  await pool.query(`
+    ALTER TABLE components
+    ADD COLUMN IF NOT EXISTS evolution DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS visibility DOUBLE PRECISION;
+  `);
+
+  // Phase 2: links between components
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS links (
+      id SERIAL PRIMARY KEY,
+      map_id INTEGER REFERENCES maps(id),
+      source_component_id INTEGER REFERENCES components(id),
+      target_component_id INTEGER REFERENCES components(id)
+    );
+  `);
 }
 
 module.exports = {
   query: (text, params) => pool.query(text, params),
   initDb,
+  getClient: () => pool.connect(),
 };

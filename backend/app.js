@@ -7,6 +7,7 @@ const path = require('path');
 require('dotenv').config();
 
 const db = require('./db');
+const { generateMapFromPrompt } = require('./ai');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -64,6 +65,78 @@ app.post('/logout', (req, res) => {
 
 app.get('/dashboard', authenticateToken, (req, res) => {
   res.json({ message: `Welcome ${req.user.username}` });
+});
+
+// Phase 2: Generate map from prompt via OpenAI
+app.post('/ai/generate-map', authenticateToken, async (req, res) => {
+  const { prompt } = req.body || {};
+  if (!prompt || typeof prompt !== 'string') return res.status(400).json({ error: 'prompt is required' });
+  try {
+    const mapData = await generateMapFromPrompt(prompt);
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+      const mapInsert = await client.query(
+        'INSERT INTO maps (user_id, name, prompt) VALUES ($1, $2, $3) RETURNING id',
+        [req.user.id, mapData.name || 'Generated Map', prompt]
+      );
+      const mapId = mapInsert.rows[0].id;
+
+      // Insert components
+      const componentIdByName = new Map();
+      for (const c of mapData.components) {
+        const ins = await client.query(
+          'INSERT INTO components (map_id, name, evolution, visibility) VALUES ($1, $2, $3, $4) RETURNING id',
+          [mapId, c.name, c.evolution, c.visibility]
+        );
+        componentIdByName.set(c.name, ins.rows[0].id);
+      }
+
+      // Insert links (skip if missing names)
+      for (const l of mapData.links) {
+        const fromId = componentIdByName.get(l.from);
+        const toId = componentIdByName.get(l.to);
+        if (fromId && toId) {
+          await client.query(
+            'INSERT INTO links (map_id, source_component_id, target_component_id) VALUES ($1, $2, $3)',
+            [mapId, fromId, toId]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      res.json({ id: mapId, ...mapData });
+    } catch (inner) {
+      await client.query('ROLLBACK');
+      throw inner;
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.error('generate-map failed:', e);
+    res.status(500).json({ error: 'Map generation failed', details: e.message });
+  }
+});
+
+// Phase 2: Fetch maps
+app.get('/maps', authenticateToken, async (req, res) => {
+  const maps = await db.query('SELECT id, name, prompt FROM maps WHERE user_id=$1 ORDER BY id DESC LIMIT 20', [req.user.id]);
+  res.json(maps.rows);
+});
+
+app.get('/maps/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const map = await db.query('SELECT id, name, prompt FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
+  if (!map.rows.length) return res.sendStatus(404);
+  const components = await db.query('SELECT id, name, evolution, visibility FROM components WHERE map_id=$1', [id]);
+  const links = await db.query('SELECT source_component_id, target_component_id FROM links WHERE map_id=$1', [id]);
+  res.json({
+    id: Number(id),
+    name: map.rows[0].name,
+    prompt: map.rows[0].prompt,
+    components: components.rows,
+    links: links.rows,
+  });
 });
 
 // Serve the frontend index for the root path
