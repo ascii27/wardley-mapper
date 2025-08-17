@@ -361,9 +361,9 @@ app.post('/ai/wizard/users-needs', authenticateToken, async (req, res) => {
 
 app.post('/ai/wizard/capabilities', authenticateToken, async (req, res) => {
   try {
-    const { needs } = req.body || {};
+    const { needs, context = '' } = req.body || {};
     if (!needs) return res.status(400).json({ error: 'needs is required' });
-    const out = await suggestCapabilities(needs);
+    const out = await suggestCapabilities(needs, context);
     res.json(out);
   } catch (e) {
     console.error('capabilities failed:', e); res.status(500).json({ error: 'failed', details: e.message });
@@ -372,9 +372,9 @@ app.post('/ai/wizard/capabilities', authenticateToken, async (req, res) => {
 
 app.post('/ai/wizard/evolution', authenticateToken, async (req, res) => {
   try {
-    const { capabilities } = req.body || {};
+    const { capabilities, context = '' } = req.body || {};
     if (!capabilities) return res.status(400).json({ error: 'capabilities is required' });
-    const out = await suggestEvolution(capabilities);
+    const out = await suggestEvolution(capabilities, context);
     res.json(out);
   } catch (e) {
     console.error('evolution failed:', e); res.status(500).json({ error: 'failed', details: e.message });

@@ -95,6 +95,8 @@
             </div>
           </div>
           <div id="wizStep2" class="hidden space-y-2">
+            <label class="font-semibold">Additional Context (optional)</label>
+            <textarea id="wizCapsContext" class="w-full border p-2 rounded" rows="2" placeholder="Any specifics to guide capability suggestions..."></textarea>
             <div class="flex gap-2">
               <button id="wizAiCaps" class="btn btn-tonal"><span class="material-symbols-outlined">insights</span>AI: Suggest Capabilities</button>
             </div>
@@ -102,6 +104,8 @@
             <textarea id="wizCaps" class="w-full border p-2 rounded" rows="6" placeholder='{"capabilities":[{"name":"Inventory API"}],"links":[{"need":"Order status","capability":"Inventory API"}]}'></textarea>
           </div>
           <div id="wizStep3" class="hidden space-y-2">
+            <label class="font-semibold">Additional Context (optional)</label>
+            <textarea id="wizEvoContext" class="w-full border p-2 rounded" rows="2" placeholder="Any specifics to guide stage suggestions (e.g., market maturity)..."></textarea>
             <div class="flex gap-2">
               <button id="wizAiEvo" class="btn btn-tonal"><span class="material-symbols-outlined">timeline</span>AI: Suggest Evolution Stages</button>
             </div>
@@ -135,9 +139,12 @@
           <div class="card p-4 space-y-2">
             <div class="flex items-center justify-between">
               <h3 id="mapTitle" class="text-xl font-semibold">Map</h3>
-              <span id="mapUpdated" class="chip"></span>
+              <div class="flex items-center gap-2">
+                <button id="toggleMapSize" class="btn btn-tonal"><span class="material-symbols-outlined">fullscreen</span>Expand</button>
+                <span id="mapUpdated" class="chip"></span>
+              </div>
             </div>
-            <canvas id="mapCanvas" width="960" height="460" class="border rounded w-full"></canvas>
+            <canvas id="mapCanvas" width="1200" height="640" class="border rounded w-full"></canvas>
           </div>
           <div class="card p-4 space-y-3">
             <h4 class="font-semibold">Edit Components & Links</h4>

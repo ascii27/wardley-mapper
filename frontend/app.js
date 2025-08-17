@@ -122,6 +122,7 @@ async function init() {
   canvas.addEventListener('mousemove', onCanvasMouseMove);
   canvas.addEventListener('mouseup', onCanvasMouseUp);
   canvas.addEventListener('click', onCanvasClick);
+  const toggleBtn = $('toggleMapSize'); if (toggleBtn) toggleBtn.addEventListener('click', toggleMapSize);
 
   // Session bootstrap
   if (localStorage.getItem('token')) await afterLogin();
@@ -277,8 +278,9 @@ function renderMap() {
   }
   // components with shapes and optional change vectors
   const showVectors = $('showVectors')?.checked;
+  function jitter(name){ let h=0; for (let i=0;i<name.length;i++) h=(h*31 + name.charCodeAt(i))|0; return ((h%7)-3)*1.5; }
   for (const c of components) {
-    const x = toX(c.evolution), y = toY(c.visibility);
+    const x = toX(c.evolution)+jitter(c.name), y = toY(c.visibility)+jitter(c.name+'y');
     // change vector
     if (showVectors && c.delta_evolution != null && c.delta_visibility != null) {
       const tx = toX(clamp01(Number(c.evolution) + Number(c.delta_evolution)));
@@ -477,7 +479,7 @@ function parseJsonField(id, fallback) {
 async function aiSuggestCapabilities() {
   try {
     const needs = parseJsonField('wizNeeds', []);
-    const res = await fetch(API + '/ai/wizard/capabilities', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ needs }) });
+    const res = await fetch(API + '/ai/wizard/capabilities', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ needs, context }) });
     const data = await res.json(); if (!res.ok) return alert('AI failed: ' + (data.error||''));
     $('wizCaps').value = JSON.stringify(data, null, 2);
   } catch (e) { /* handled */ }
@@ -487,7 +489,7 @@ async function aiSuggestEvolution() {
   try {
     const caps = parseJsonField('wizCaps', {capabilities:[]});
     const capabilities = caps.capabilities || [];
-    const res = await fetch(API + '/ai/wizard/evolution', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ capabilities }) });
+    const res = await fetch(API + '/ai/wizard/evolution', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ capabilities, context }) });
     const data = await res.json(); if (!res.ok) return alert('AI failed: ' + (data.error||''));
     $('wizStages').value = JSON.stringify(data, null, 2);
   } catch (e) { /* handled */ }
@@ -558,4 +560,20 @@ async function createMapFromWizard() {
     await populateMaps();
     await loadMap(mapId);
   } catch (e) { alert('Failed to create map from wizard.'); }
+}
+
+
+function toggleMapSize() {
+  const canvas = $('mapCanvas');
+  if (!canvas) return;
+  const expanded = canvas.dataset.size === 'expanded';
+  const btn = $('toggleMapSize');
+  if (expanded) {
+    canvas.width = 1200; canvas.height = 640; canvas.dataset.size = '';
+    if (btn) btn.innerHTML = '<span class="material-symbols-outlined">fullscreen</span>Expand';
+  } else {
+    canvas.width = 1600; canvas.height = 900; canvas.dataset.size = 'expanded';
+    if (btn) btn.innerHTML = '<span class="material-symbols-outlined">fullscreen_exit</span>Collapse';
+  }
+  renderMap();
 }

@@ -104,15 +104,15 @@ async function suggestUsersNeeds(contextText, fetchImpl = fetch) {
   return callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }], fetchImpl);
 }
 
-async function suggestCapabilities(needsJson, fetchImpl = fetch) {
+async function suggestCapabilities(needsJson, context = '', fetchImpl = fetch) {
   const sys = 'Return ONLY JSON { capabilities:[{ name:string }], links:[{ need:string, capability:string }] }.';
-  const user = `Given these needs: ${JSON.stringify(needsJson)} propose capabilities and Need->Capability links.`;
+  const user = `Context: ${context}\nGiven these needs: ${JSON.stringify(needsJson)} propose capabilities and Need->Capability links.`;
   return callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }], fetchImpl);
 }
 
-async function suggestEvolution(capabilitiesJson, fetchImpl = fetch) {
+async function suggestEvolution(capabilitiesJson, context = '', fetchImpl = fetch) {
   const sys = 'Return ONLY JSON [{ name:string, stage:number(1..4), rationale:string }] based on Wardley evolution (Genesis, Custom, Product, Commodity).';
-  const user = `Capabilities: ${JSON.stringify(capabilitiesJson)}. Suggest stage 1..4 per item with a short rationale.`;
+  const user = `Context: ${context}\nCapabilities: ${JSON.stringify(capabilitiesJson)}. Suggest stage 1..4 per item with a short rationale.`;
   return callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }], fetchImpl);
 }
 
