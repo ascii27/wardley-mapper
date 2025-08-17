@@ -35,6 +35,12 @@ async function initDb() {
     );
   `);
 
+  // Ensure prompt column exists for existing deployments
+  await pool.query(`
+    ALTER TABLE maps
+    ADD COLUMN IF NOT EXISTS prompt TEXT;
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS components (
       id SERIAL PRIMARY KEY,
