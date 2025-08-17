@@ -122,6 +122,7 @@ Wardley Mapper is a collaborative, AI-powered web application for creating, edit
 Each phase delivers a functional milestone of the Wardley Mapper, allowing for iterative testing and feedback. The plan is designed to provide value early and frequently.
 
 #### **Phase 1: Project Bootstrapping & Core Infrastructure**
+- Initialize local Git repository and set up basic project structure
 - Initialize PostgreSQL schema (`users`, `maps`, `components`)
 - Implement basic authentication (signup/login/logout)
 - Simple frontend layout with placeholder components
