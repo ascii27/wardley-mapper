@@ -72,9 +72,58 @@
         <button id="logoutSidebar" class="btn btn-tonal w-full"><span class="material-symbols-outlined">logout</span>Logout</button>
       </aside>
       <section class="main">
-        <div id="wizardView" class="hidden card p-4 space-y-2">
-          <h3 class="text-xl font-semibold">Guided Map Creator (scaffold)</h3>
-          <p class="text-sm text-gray-700">AI-assisted steps to capture Users, Needs, Capabilities, and placement. UI coming next.</p>
+        <div id="wizardView" class="hidden card p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xl font-semibold">Guided Map Creator</h3>
+            <div class="text-sm">Step <span id="wizStepNum">1</span> / 5</div>
+          </div>
+          <div id="wizStep1" class="space-y-2">
+            <label class="font-semibold">Context</label>
+            <textarea id="wizContext" class="w-full border p-2 rounded" rows="3" placeholder="Describe your users and problem space..."></textarea>
+            <div class="flex gap-2">
+              <button id="wizAiUsers" class="btn btn-tonal"><span class="material-symbols-outlined">sparkles</span>AI: Suggest Users & Needs</button>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <h4 class="font-semibold">Users</h4>
+                <textarea id="wizUsers" class="w-full border p-2 rounded" rows="6" placeholder='["Customer","Operator"]'></textarea>
+              </div>
+              <div>
+                <h4 class="font-semibold">Needs</h4>
+                <textarea id="wizNeeds" class="w-full border p-2 rounded" rows="6" placeholder='[{"name":"Order status","forUser":"Customer"}]'></textarea>
+              </div>
+            </div>
+          </div>
+          <div id="wizStep2" class="hidden space-y-2">
+            <div class="flex gap-2">
+              <button id="wizAiCaps" class="btn btn-tonal"><span class="material-symbols-outlined">insights</span>AI: Suggest Capabilities</button>
+            </div>
+            <h4 class="font-semibold">Capabilities</h4>
+            <textarea id="wizCaps" class="w-full border p-2 rounded" rows="6" placeholder='{"capabilities":[{"name":"Inventory API"}],"links":[{"need":"Order status","capability":"Inventory API"}]}'></textarea>
+          </div>
+          <div id="wizStep3" class="hidden space-y-2">
+            <div class="flex gap-2">
+              <button id="wizAiEvo" class="btn btn-tonal"><span class="material-symbols-outlined">timeline</span>AI: Suggest Evolution Stages</button>
+            </div>
+            <h4 class="font-semibold">Stages (I..IV)</h4>
+            <textarea id="wizStages" class="w-full border p-2 rounded" rows="6" placeholder='[{"name":"Inventory API","stage":3,"rationale":"Productized API"}]'></textarea>
+          </div>
+          <div id="wizStep4" class="hidden space-y-2">
+            <h4 class="font-semibold">Change (optional)</h4>
+            <textarea id="wizDeltas" class="w-full border p-2 rounded" rows="6" placeholder='[{"name":"Inventory API","delta_evolution":0.1,"delta_visibility":0.05}]'></textarea>
+          </div>
+          <div id="wizStep5" class="hidden space-y-2">
+            <label class="font-semibold">Map Name</label>
+            <input id="wizName" class="border p-2 rounded w-full" placeholder="My Map" />
+            <div class="text-sm text-gray-600">Review entries above, then Create Map.</div>
+          </div>
+          <div class="flex items-center justify-between">
+            <button id="wizBack" class="btn btn-tonal"><span class="material-symbols-outlined">arrow_back</span>Back</button>
+            <div class="flex gap-2">
+              <button id="wizNext" class="btn btn-primary">Next<span class="material-symbols-outlined">arrow_forward</span></button>
+              <button id="wizCreate" class="btn btn-primary hidden"><span class="material-symbols-outlined">check_circle</span>Create Map</button>
+            </div>
+          </div>
         </div>
         <div id="generatorView" class="card p-4 space-y-3">
           <h3 class="text-xl font-semibold">Generate Map from Prompt</h3>

@@ -10,6 +10,7 @@ let dragState = null;
 let pendingLinkSourceId = null;
 let sessionId = null;
 let mapsList = [];
+let wizardStep = 1;
 
 // DOM helpers
 function $(id) { return document.getElementById(id); }
@@ -75,6 +76,18 @@ async function init() {
     await populateMaps();
     renderMap();
   });
+
+  // Wizard handlers
+  const wizBack = $('wizBack'), wizNext = $('wizNext'), wizCreate = $('wizCreate');
+  if (wizBack && wizNext && wizCreate) {
+    wizBack.addEventListener('click', () => wizardShowStep(wizardStep - 1));
+    wizNext.addEventListener('click', () => wizardShowStep(wizardStep + 1));
+    wizCreate.addEventListener('click', createMapFromWizard);
+  }
+  const wizAiUsers = $('wizAiUsers'); if (wizAiUsers) wizAiUsers.addEventListener('click', aiSuggestUsersNeeds);
+  const wizAiCaps = $('wizAiCaps'); if (wizAiCaps) wizAiCaps.addEventListener('click', aiSuggestCapabilities);
+  const wizAiEvo = $('wizAiEvo'); if (wizAiEvo) wizAiEvo.addEventListener('click', aiSuggestEvolution);
+
 
   // Auth forms
   $('signupForm').addEventListener('submit', async (e) => {
@@ -429,4 +442,120 @@ if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', init);
 } else {
   init();
+}
+
+
+// Wizard helpers
+function wizardShowStep(n) {
+  wizardStep = Math.max(1, Math.min(5, n));
+  const steps = [1,2,3,4,5];
+  steps.forEach(i => {
+    const el = $(`wizStep${i}`);
+    if (el) el.classList.toggle('hidden', i !== wizardStep);
+  });
+  const num = $('wizStepNum'); if (num) num.textContent = String(wizardStep);
+  const next = $('wizNext'), back = $('wizBack'), create = $('wizCreate');
+  if (back) back.disabled = wizardStep === 1;
+  if (next) next.classList.toggle('hidden', wizardStep === 5);
+  if (create) create.classList.toggle('hidden', wizardStep !== 5);
+}
+
+async function aiSuggestUsersNeeds() {
+  try {
+    const context = $('wizContext').value.trim(); if (!context) return alert('Please provide context.');
+    const res = await fetch(API + '/ai/wizard/users-needs', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ context }) });
+    const data = await res.json(); if (!res.ok) return alert('AI failed: ' + (data.error||''));
+    if (Array.isArray(data.users)) $('wizUsers').value = JSON.stringify(data.users, null, 2);
+    if (Array.isArray(data.needs)) $('wizNeeds').value = JSON.stringify(data.needs, null, 2);
+  } catch (e) { alert('AI error'); }
+}
+
+function parseJsonField(id, fallback) {
+  try { const v = $(id).value.trim(); if (!v) return fallback; return JSON.parse(v); } catch { alert(`Invalid JSON in ${id}`); throw new Error('parse'); }
+}
+
+async function aiSuggestCapabilities() {
+  try {
+    const needs = parseJsonField('wizNeeds', []);
+    const res = await fetch(API + '/ai/wizard/capabilities', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ needs }) });
+    const data = await res.json(); if (!res.ok) return alert('AI failed: ' + (data.error||''));
+    $('wizCaps').value = JSON.stringify(data, null, 2);
+  } catch (e) { /* handled */ }
+}
+
+async function aiSuggestEvolution() {
+  try {
+    const caps = parseJsonField('wizCaps', {capabilities:[]});
+    const capabilities = caps.capabilities || [];
+    const res = await fetch(API + '/ai/wizard/evolution', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ capabilities }) });
+    const data = await res.json(); if (!res.ok) return alert('AI failed: ' + (data.error||''));
+    $('wizStages').value = JSON.stringify(data, null, 2);
+  } catch (e) { /* handled */ }
+}
+
+function stageToEvolution(stage) {
+  const s = Number(stage);
+  if (s === 1) return 0.125;
+  if (s === 2) return 0.375;
+  if (s === 3) return 0.625;
+  if (s === 4) return 0.875;
+  return 0.5;
+}
+
+async function createMapFromWizard() {
+  try {
+    const name = $('wizName').value.trim() || 'Untitled Map';
+    const res = await fetch(API + '/maps', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ name }) });
+    const map = await res.json(); if (!res.ok) return alert('Create map failed');
+    const mapId = map.id; currentMapId = mapId;
+
+    const users = parseJsonField('wizUsers', []);
+    const needs = parseJsonField('wizNeeds', []);
+    const capObj = parseJsonField('wizCaps', {capabilities:[],links:[]});
+    const caps = capObj.capabilities || [];
+    const needCapLinks = capObj.links || [];
+    const stages = parseJsonField('wizStages', []);
+    const deltas = parseJsonField('wizDeltas', []);
+    const stageByName = new Map(stages.map(x => [x.name, x.stage]));
+    const deltaByName = new Map(deltas.map(x => [x.name, {de:x.delta_evolution, dv:x.delta_visibility}]));
+
+    const nameToId = new Map();
+    for (const u of users) {
+      const r = await fetch(API + `/maps/${mapId}/components`, { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ name: u, kind:'user', evolution: 0.9, visibility: 0.95 }) });
+      const d = await r.json(); if (r.ok) nameToId.set(u, d.id);
+    }
+    for (const n of needs) {
+      const r = await fetch(API + `/maps/${mapId}/components`, { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ name: n.name, kind:'need', evolution: 0.6, visibility: 0.9 }) });
+      const d = await r.json(); if (r.ok) {
+        nameToId.set(n.name, d.id);
+        const uid = nameToId.get(n.forUser);
+        if (uid) {
+          await fetch(API + `/maps/${mapId}/links`, { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ sourceId: uid, targetId: d.id }) });
+        }
+      }
+    }
+    for (const c of caps) {
+      const st = stageByName.get(c.name);
+      const evo = st ? stageToEvolution(st) : 0.5;
+      const dv = deltaByName.get(c.name) || {};
+      const body = { name: c.name, kind:'capability', evolution: evo, visibility: 0.6 };
+      if (dv.de !== undefined) body.delta_evolution = dv.de;
+      if (dv.dv !== undefined) body.delta_visibility = dv.dv;
+      const r = await fetch(API + `/maps/${mapId}/components`, { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify(body) });
+      const d = await r.json(); if (r.ok) nameToId.set(c.name, d.id);
+    }
+    for (const l of needCapLinks) {
+      const sid = nameToId.get(l.need), tid = nameToId.get(l.capability);
+      if (sid && tid) {
+        await fetch(API + `/maps/${mapId}/links`, { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ sourceId: sid, targetId: tid }) });
+      }
+    }
+
+    const wiz = $('wizardView'); if (wiz) wiz.classList.add('hidden');
+    const ed = $('editorView'); if (ed) ed.classList.remove('hidden');
+    const gen = $('generatorView'); if (gen) gen.classList.add('hidden');
+    const g = $('guidesView'); if (g) g.classList.add('hidden');
+    await populateMaps();
+    await loadMap(mapId);
+  } catch (e) { alert('Failed to create map from wizard.'); }
 }
