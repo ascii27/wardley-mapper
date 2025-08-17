@@ -135,7 +135,7 @@ app.get('/maps/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const map = await db.query('SELECT id, name, prompt FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
   if (!map.rows.length) return res.sendStatus(404);
-  const components = await db.query('SELECT id, name, evolution, visibility FROM components WHERE map_id=$1', [id]);
+  const components = await db.query('SELECT id, name, evolution, visibility, kind, delta_evolution, delta_visibility FROM components WHERE map_id=$1', [id]);
   const links = await db.query('SELECT id, source_component_id, target_component_id FROM links WHERE map_id=$1', [id]);
   // link names for context convenience
   const linkRows = [];
@@ -156,13 +156,13 @@ app.get('/maps/:id', authenticateToken, async (req, res) => {
 // Phase 3: Component CRUD
 app.post('/maps/:id/components', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { name, evolution = 0.5, visibility = 0.5 } = req.body || {};
+  const { name, evolution = 0.5, visibility = 0.5, kind = 'capability', delta_evolution = null, delta_visibility = null } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
   const map = await db.query('SELECT id FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
   if (!map.rows.length) return res.sendStatus(404);
   const ins = await db.query(
-    'INSERT INTO components (map_id, name, evolution, visibility) VALUES ($1, $2, $3, $4) RETURNING id, name, evolution, visibility',
-    [id, name, clamp01(evolution), clamp01(visibility)]
+    'INSERT INTO components (map_id, name, evolution, visibility, kind, delta_evolution, delta_visibility) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, evolution, visibility, kind, delta_evolution, delta_visibility',
+    [id, name, clamp01(evolution), clamp01(visibility), sanitizeKind(kind), normalizeDelta(delta_evolution), normalizeDelta(delta_visibility)]
   );
   res.status(201).json(ins.rows[0]);
 });
@@ -173,16 +173,19 @@ app.patch('/maps/:id/components/:componentId', authenticateToken, async (req, re
   if (!map.rows.length) return res.sendStatus(404);
   const existing = await db.query('SELECT id FROM components WHERE id=$1 AND map_id=$2', [componentId, id]);
   if (!existing.rows.length) return res.sendStatus(404);
-  const { name, evolution, visibility } = req.body || {};
+  const { name, evolution, visibility, kind, delta_evolution, delta_visibility } = req.body || {};
   const fields = [];
   const values = [];
   if (name !== undefined) { fields.push('name'); values.push(name); }
   if (evolution !== undefined) { fields.push('evolution'); values.push(clamp01(evolution)); }
   if (visibility !== undefined) { fields.push('visibility'); values.push(clamp01(visibility)); }
+  if (kind !== undefined) { fields.push('kind'); values.push(sanitizeKind(kind)); }
+  if (delta_evolution !== undefined) { fields.push('delta_evolution'); values.push(normalizeDelta(delta_evolution)); }
+  if (delta_visibility !== undefined) { fields.push('delta_visibility'); values.push(normalizeDelta(delta_visibility)); }
   if (!fields.length) return res.status(400).json({ error: 'no fields to update' });
   const setClause = fields.map((f, i) => `${f}=$${i+1}`).join(', ');
   values.push(componentId);
-  const upd = await db.query(`UPDATE components SET ${setClause} WHERE id=$${values.length} RETURNING id, name, evolution, visibility`, values);
+  const upd = await db.query(`UPDATE components SET ${setClause} WHERE id=$${values.length} RETURNING id, name, evolution, visibility, kind, delta_evolution, delta_visibility`, values);
   res.json(upd.rows[0]);
 });
 
@@ -338,6 +341,18 @@ function clamp01(v) {
   const n = Number(v);
   if (Number.isNaN(n)) return 0.5;
   return Math.max(0, Math.min(1, n));
+}
+
+function sanitizeKind(k) {
+  const s = (k || '').toString().toLowerCase();
+  if (s === 'user' || s === 'need' || s === 'capability') return s;
+  return 'capability';
+}
+function normalizeDelta(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  if (Number.isNaN(n)) return null;
+  return Math.max(-1, Math.min(1, n));
 }
 
 // Serve the frontend index for the root path

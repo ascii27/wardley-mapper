@@ -64,6 +64,8 @@ async function init() {
   $('addComponent').addEventListener('click', addComponentHandler);
   $('deleteComponent').addEventListener('click', deleteSelectedComponent);
   $('sendChat').addEventListener('click', sendChatMessage);
+  $('saveSelected').addEventListener('click', saveSelectedDetails);
+  $('showVectors').addEventListener('change', () => renderMap());
 
   // Canvas interactions
   const canvas = $('mapCanvas');
@@ -175,7 +177,8 @@ async function loadMap(id) {
 async function addComponentHandler() {
   if (!currentMapId) return;
   const name = $('newComponentName').value.trim(); if (!name) return;
-  const res = await fetch(API + `/maps/${currentMapId}/components`, { method:'POST', headers: { 'Content-Type':'application/json','Authorization': 'Bearer ' + localStorage.getItem('token') }, body: JSON.stringify({ name, evolution: 0.5, visibility: 0.5 }) });
+  const kind = $('newComponentKind').value || 'capability';
+  const res = await fetch(API + `/maps/${currentMapId}/components`, { method:'POST', headers: { 'Content-Type':'application/json','Authorization': 'Bearer ' + localStorage.getItem('token') }, body: JSON.stringify({ name, evolution: 0.5, visibility: 0.5, kind }) });
   const data = await res.json(); if (!res.ok) { $('editStatus').textContent = 'Error: ' + (data.error || 'add failed'); return; }
   components.push(data); $('newComponentName').value=''; renderMap();
 }
@@ -193,10 +196,28 @@ function renderMap() {
   const w = canvas.width, h = canvas.height; ctx.clearRect(0, 0, w, h);
   // axes
   ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(40, 10); ctx.lineTo(40, h-30); ctx.lineTo(w-10, h-30); ctx.stroke();
-  ctx.fillStyle = '#444'; ctx.fillText('Visibility ↑', 5, 20); ctx.fillText('Evolution →', w-110, h-10);
+  ctx.fillStyle = '#444';
+  ctx.fillText('Value Chain (Invisible → Visible)', 45, 20);
+  ctx.fillText('Evolution', w/2 - 20, h - 10);
   const x0 = 40, y0 = h-30, x1 = w-10, y1 = 10;
   const toX = (evolution) => x0 + (x1 - x0) * clamp01(evolution);
   const toY = (visibility) => y0 - (y0 - y1) * clamp01(visibility);
+
+  // X stages and labels
+  ctx.setLineDash([4, 4]);
+  [0.25, 0.5, 0.75].forEach(p => {
+    const x = toX(p);
+    ctx.strokeStyle = '#ddd'; ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#555';
+  const labels = ['Genesis', 'Custom', 'Product', 'Commodity'];
+  [0.0, 0.25, 0.5, 0.75].forEach((p, i) => {
+    const x = toX(p) + 5; ctx.fillText(labels[i], x, h - 15);
+  });
+
+  // Horizontal dotted threshold to split Users/Needs (above) from Capabilities (below)
+  ctx.setLineDash([2, 4]); ctx.strokeStyle = '#bbb'; ctx.beginPath(); ctx.moveTo(40, 50); ctx.lineTo(w-10, 50); ctx.stroke(); ctx.setLineDash([]);
   // links
   ctx.strokeStyle = '#aaa';
   for (const l of links) {
@@ -205,12 +226,35 @@ function renderMap() {
     if (!from || !to) continue;
     ctx.beginPath(); ctx.moveTo(toX(from.evolution), toY(from.visibility)); ctx.lineTo(toX(to.evolution), toY(to.visibility)); ctx.stroke();
   }
-  // components
+  // components with shapes and optional change vectors
+  const showVectors = $('showVectors')?.checked;
   for (const c of components) {
     const x = toX(c.evolution), y = toY(c.visibility);
-    ctx.fillStyle = (c.id === selectedComponentId) ? '#f59e0b' : '#2563eb';
-    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#111'; ctx.fillText(c.name, x + 8, y - 8);
+    // change vector
+    if (showVectors && c.delta_evolution != null && c.delta_visibility != null) {
+      const tx = toX(clamp01(Number(c.evolution) + Number(c.delta_evolution)));
+      const ty = toY(clamp01(Number(c.visibility) + Number(c.delta_visibility)));
+      ctx.strokeStyle = '#999'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke();
+      const ang = Math.atan2(ty - y, tx - x);
+      const ah = 6; ctx.beginPath(); ctx.moveTo(tx, ty);
+      ctx.lineTo(tx - ah * Math.cos(ang - Math.PI / 6), ty - ah * Math.sin(ang - Math.PI / 6));
+      ctx.lineTo(tx - ah * Math.cos(ang + Math.PI / 6), ty - ah * Math.sin(ang + Math.PI / 6));
+      ctx.closePath(); ctx.fillStyle = '#999'; ctx.fill();
+    }
+
+    const kind = (c.kind || 'capability').toLowerCase();
+    const selected = c.id === selectedComponentId;
+    const fill = selected ? '#f59e0b' : (kind === 'user' ? '#7c3aed' : kind === 'need' ? '#059669' : '#2563eb');
+    ctx.fillStyle = fill; ctx.strokeStyle = fill;
+    if (kind === 'user') {
+      const s = 8; ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y); ctx.closePath(); ctx.fill();
+    } else if (kind === 'need') {
+      const rw = 24, rh = 14, r = 5; const lx = x - rw/2, ly = y - rh/2;
+      roundRect(ctx, lx, ly, rw, rh, r); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = '#111'; ctx.fillText(c.name, x + 10, y - 8);
   }
   // Links list UI
   const list = $('linksList'); if (list) {
@@ -250,6 +294,15 @@ function onCanvasMouseDown(e) {
   const canvas = $('mapCanvas'); const pos = getMousePos(canvas, e); const hit = hitTest(pos.x, pos.y);
   if (hit) { selectedComponentId = hit.id; dragState = { id: hit.id, startX: pos.x, startY: pos.y }; renderMap(); }
   else { selectedComponentId = null; dragState = null; renderMap(); }
+  // populate selected controls
+  const sel = components.find(c => c.id === selectedComponentId);
+  if (sel) {
+    $('compKind').value = (sel.kind || 'capability');
+    $('deltaEvo').value = sel.delta_evolution ?? '';
+    $('deltaVis').value = sel.delta_visibility ?? '';
+  } else {
+    $('compKind').value = 'capability'; $('deltaEvo').value = ''; $('deltaVis').value = '';
+  }
 }
 function onCanvasMouseMove(e) {
   const canvas = $('mapCanvas'); const pos = getMousePos(canvas, e);
@@ -288,6 +341,25 @@ async function onCanvasClick(e) {
       else { $('editStatus').textContent = 'Error: ' + (data.error || 'link failed'); }
     }
   }
+}
+
+async function saveSelectedDetails() {
+  if (!currentMapId || !selectedComponentId) return;
+  const kind = $('compKind').value;
+  const delta_evolution = $('deltaEvo').value;
+  const delta_visibility = $('deltaVis').value;
+  const res = await fetch(API + `/maps/${currentMapId}/components/${selectedComponentId}`, { method:'PATCH', headers:{ 'Content-Type': 'application/json','Authorization': 'Bearer ' + localStorage.getItem('token') }, body: JSON.stringify({ kind, delta_evolution, delta_visibility })});
+  const data = await res.json(); if (!res.ok) { $('editStatus').textContent = 'Error saving'; return; }
+  const idx = components.findIndex(c=>c.id===selectedComponentId); if (idx>=0) components[idx]=data; renderMap();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 // Chat

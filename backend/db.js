@@ -56,6 +56,15 @@ async function initDb() {
     ADD COLUMN IF NOT EXISTS visibility DOUBLE PRECISION;
   `);
 
+  // Phase 5b: add kind and change vectors
+  await pool.query(`
+    ALTER TABLE components
+    ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'capability',
+    ADD COLUMN IF NOT EXISTS delta_evolution DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS delta_visibility DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS changed_at TIMESTAMPTZ;
+  `);
+
   // Phase 2: links between components
   await pool.query(`
     CREATE TABLE IF NOT EXISTS links (

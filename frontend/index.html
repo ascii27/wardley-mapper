@@ -83,12 +83,33 @@
             <h4 class="font-semibold">Edit Components & Links</h4>
             <div class="flex gap-2 items-center">
               <input id="newComponentName" class="border p-2 rounded" placeholder="New component name" />
+              <select id="newComponentKind" class="border p-2 rounded">
+                <option value="capability" selected>Capability</option>
+                <option value="need">Need</option>
+                <option value="user">User</option>
+              </select>
               <button id="addComponent" class="btn btn-tonal"><span class="material-symbols-outlined">add_circle</span>Add</button>
               <button id="deleteComponent" class="btn btn-danger"><span class="material-symbols-outlined">delete</span>Delete Selected</button>
               <label class="ml-4 inline-flex items-center gap-1">
                 <input type="checkbox" id="linkMode" /> Link mode
               </label>
+              <label class="ml-4 inline-flex items-center gap-1">
+                <input type="checkbox" id="showVectors" /> Show change vectors
+              </label>
               <span id="editStatus" class="text-sm text-gray-600"></span>
+            </div>
+            <div class="flex gap-2 items-center">
+              <label class="text-sm">Selected type</label>
+              <select id="compKind" class="border p-2 rounded">
+                <option value="capability">Capability</option>
+                <option value="need">Need</option>
+                <option value="user">User</option>
+              </select>
+              <label class="text-sm">Δevo</label>
+              <input id="deltaEvo" type="number" step="0.05" min="-1" max="1" class="border p-2 rounded w-24" />
+              <label class="text-sm">Δvis</label>
+              <input id="deltaVis" type="number" step="0.05" min="-1" max="1" class="border p-2 rounded w-24" />
+              <button id="saveSelected" class="btn btn-primary"><span class="material-symbols-outlined">save</span>Save</button>
             </div>
             <div>
               <h4 class="font-semibold">Links</h4>
