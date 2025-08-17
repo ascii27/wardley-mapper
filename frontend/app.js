@@ -80,7 +80,8 @@ async function afterLogin() {
   const token = localStorage.getItem('token');
   const res = await fetch(API + '/dashboard', { headers: { 'Authorization': 'Bearer ' + token } });
   const data = await res.json();
-  $('welcome').innerText = data.message || 'Logged in';
+  const w = $('welcome');
+  if (w) w.innerText = data.message || 'Logged in';
   showApp();
   await populateMaps();
 }
@@ -296,12 +297,4 @@ function appendChat(role, content) {
   div.className = role === 'assistant' ? 'mb-2' : 'mb-2'; div.textContent = `${role}: ${content}`; log.appendChild(div); log.scrollTop = log.scrollHeight;
 }
 
-// Sidebar create map button handler attaches prompt dialogs
-$('newMapBtn')?.addEventListener('click', async () => {
-  const name = prompt('New map name:'); if (name === null) return;
-  const description = prompt('Description (optional):') || '';
-  await createMap(name, description); $('generatorView').classList.remove('hidden'); $('editorView').classList.add('hidden');
-});
-
 window.addEventListener('DOMContentLoaded', init);
-
