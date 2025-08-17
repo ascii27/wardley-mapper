@@ -2,7 +2,10 @@
 
 ## Project Structure & Module Organization
 - `backend/`: Node.js Express API, DB setup in `db.js`, entry `app.js`, script `init-db.js`.
-- `frontend/`: Static client in `index.html` that talks to the API at `http://localhost:3000`.
+- `frontend/`: Client app served by Express.
+  - `index.html` layout with sidebar + generator/editor views
+  - `app.js` client logic (auth, maps, canvas, chat)
+  - `styles.css` custom styles (cards, buttons, grid)
 - `intents/`: Product docs and phased execution notes.
 
 ## Build, Test, and Development Commands
