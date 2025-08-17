@@ -33,9 +33,10 @@ async function init() {
   $('logoutBtn').addEventListener('click', logout);
   $('logoutSidebar').addEventListener('click', logout);
   $('profileBtn').addEventListener('click', () => alert('Profile coming soon'));
+  const guidesBtn = $('guidesBtn'); if (guidesBtn) guidesBtn.addEventListener('click', showGuides);
   $('newMapBtn').addEventListener('click', () => {
     currentMapId = null; components = []; links = []; selectedComponentId = null;
-    $('generatorView').classList.remove('hidden'); $('editorView').classList.add('hidden');
+    $('generatorView').classList.remove('hidden'); $('editorView').classList.add('hidden'); $('guidesView')?.classList.add('hidden');
     renderMap();
   });
 
@@ -139,7 +140,7 @@ async function deleteMap(m) {
   const res = await fetch(API + `/maps/${m.id}`, { method:'DELETE', headers:{ 'Authorization': 'Bearer '+localStorage.getItem('token') } });
   if (!res.ok) { alert('Delete failed'); return; }
   mapsList = mapsList.filter(x=>x.id!==m.id); renderMapList();
-  if (currentMapId===m.id) { currentMapId=null; components=[]; links=[]; $('editorView').classList.add('hidden'); $('generatorView').classList.remove('hidden'); renderMap(); }
+  if (currentMapId===m.id) { currentMapId=null; components=[]; links=[]; $('editorView').classList.add('hidden'); $('guidesView')?.classList.add('hidden'); $('generatorView').classList.remove('hidden'); renderMap(); }
 }
 
 // Generator
@@ -152,7 +153,7 @@ async function generateMapFromPrompt() {
     $('genStatus').textContent = `Map generated: ${data.name || ''}`;
     currentMapId = data.id; components = (data.components||[]).map(c=>({ ...c })); links = (data.links||[]).map(l=>({ ...l }));
     $('mapTitle').textContent = data.name || 'Map'; $('mapUpdated').textContent = 'Just now';
-    $('generatorView').classList.add('hidden'); $('editorView').classList.remove('hidden');
+    $('generatorView').classList.add('hidden'); $('editorView').classList.remove('hidden'); $('guidesView')?.classList.add('hidden');
     await populateMaps();
     renderMap();
     await loadChat();
@@ -165,7 +166,7 @@ async function loadMap(id) {
   const data = await res.json(); if (!res.ok) return;
   currentMapId = id; components = (data.components||[]).map(c=>({ ...c })); links = (data.links||[]).map(l=>({ ...l }));
   $('mapTitle').textContent = data.name || 'Map'; $('mapUpdated').textContent = data.description ? data.description : '';
-  $('generatorView').classList.add('hidden'); $('editorView').classList.remove('hidden');
+  $('generatorView').classList.add('hidden'); $('editorView').classList.remove('hidden'); $('guidesView')?.classList.add('hidden');
   renderMap();
   await loadChat();
 }
@@ -307,6 +308,13 @@ async function sendChatMessage() {
 function appendChat(role, content) {
   const log = $('chatLog'); const div = document.createElement('div');
   div.className = role === 'assistant' ? 'mb-2' : 'mb-2'; div.textContent = `${role}: ${content}`; log.appendChild(div); log.scrollTop = log.scrollHeight;
+}
+
+function showGuides() {
+  const g = $('guidesView'); if (!g) return;
+  $('generatorView')?.classList.add('hidden');
+  $('editorView')?.classList.add('hidden');
+  g.classList.remove('hidden');
 }
 
 if (document.readyState === 'loading') {
