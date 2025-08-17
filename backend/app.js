@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const path = require('path');
 require('dotenv').config();
 
 const db = require('./db');
@@ -12,6 +13,9 @@ const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
+// Serve frontend assets from ../frontend via Express
+const frontendDir = path.join(__dirname, '../frontend');
+app.use(express.static(frontendDir));
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -33,6 +37,11 @@ app.post('/signup', async (req, res) => {
     const token = jwt.sign({ id: result.rows[0].id, username }, process.env.JWT_SECRET || 'secret');
     res.json({ token });
   } catch (err) {
+    // Unique violation
+    if (err && err.code === '23505') {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    console.error('Signup failed:', err);
     res.status(400).json({ error: 'User creation failed' });
   }
 });
@@ -57,5 +66,17 @@ app.get('/dashboard', authenticateToken, (req, res) => {
   res.json({ message: `Welcome ${req.user.username}` });
 });
 
-app.get('/', (req, res) => res.send('Wardley Mapper API'));
-app.listen(port, () => console.log(`API running on port ${port}`));
+// Serve the frontend index for the root path
+app.get('/', (req, res) => {
+  res.sendFile(path.join(frontendDir, 'index.html'));
+});
+// Initialize DB then start server
+(async () => {
+  try {
+    await db.initDb();
+    app.listen(port, () => console.log(`API running on port ${port}`));
+  } catch (e) {
+    console.error('Database initialization failed at startup:', e);
+    process.exit(1);
+  }
+})();

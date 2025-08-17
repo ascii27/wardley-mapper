@@ -28,7 +28,8 @@
     <button id="logout" class="bg-red-500 text-white px-2">Logout</button>
   </div>
   <script>
-    const API = 'http://localhost:3000';
+    // Use same-origin API when served by Express
+    const API = '';
     const token = localStorage.getItem('token');
 
     if (token) showDashboard();

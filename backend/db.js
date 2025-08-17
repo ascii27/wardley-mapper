@@ -1,13 +1,21 @@
 const { Pool } = require('pg');
-let pool;
-if (process.env.DATABASE_URL) {
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
-} else {
-  const { newDb } = require('pg-mem');
-  const db = newDb();
-  const pgMem = db.adapters.createPg();
-  pool = new pgMem.Pool();
+require('dotenv').config();
+
+// Require URL and user; password may be empty or omitted (e.g., local trust auth)
+const requiredEnv = ['DATABASE_URL', 'DB_USER'];
+const missing = requiredEnv.filter((k) => process.env[k] === undefined || process.env[k] === '');
+if (missing.length) {
+  throw new Error(
+    `Missing required environment variables: ${missing.join(', ')}. Set them in a .env file or the environment.`
+  );
 }
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  user: process.env.DB_USER,
+  // Allow empty password explicitly
+  password: process.env.DB_PASSWORD !== undefined ? process.env.DB_PASSWORD : undefined,
+});
 
 async function initDb() {
   await pool.query(`
