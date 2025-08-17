@@ -106,6 +106,7 @@ function renderMapList() {
     .filter(m => !q || (m.name||'').toLowerCase().includes(q) || (m.description||'').toLowerCase().includes(q))
     .forEach(m => {
       const li = document.createElement('li');
+      if (m.id === currentMapId) li.classList.add('active');
       const left = document.createElement('div');
       const name = document.createElement('div'); name.textContent = m.name || 'Untitled';
       const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = (m.updated_at ? new Date(m.updated_at).toLocaleString() : '');
@@ -231,7 +232,12 @@ function renderMap() {
 
 function clamp01(v){ const n = Number(v); if (Number.isNaN(n)) return 0.5; return Math.max(0, Math.min(1, n)); }
 
-function getMousePos(canvas, evt) { const r = canvas.getBoundingClientRect(); return { x: evt.clientX - r.left, y: evt.clientY - r.top }; }
+function getMousePos(canvas, evt) {
+  const r = canvas.getBoundingClientRect();
+  const sx = canvas.width / r.width;
+  const sy = canvas.height / r.height;
+  return { x: (evt.clientX - r.left) * sx, y: (evt.clientY - r.top) * sy };
+}
 function hitTest(x, y) {
   const canvas = $('mapCanvas'); const w = canvas.width, h = canvas.height; const x0 = 40, x1 = w-10, y0 = h-30, y1 = 10;
   const toPixX = (e) => x0 + (x1 - x0) * clamp01(e); const toPixY = (v) => y0 - (y0 - y1) * clamp01(v);
@@ -245,7 +251,13 @@ function onCanvasMouseDown(e) {
   else { selectedComponentId = null; dragState = null; renderMap(); }
 }
 function onCanvasMouseMove(e) {
-  if (!dragState) return; const canvas = $('mapCanvas'); const pos = getMousePos(canvas, e);
+  const canvas = $('mapCanvas'); const pos = getMousePos(canvas, e);
+  if (!dragState) {
+    const hover = hitTest(pos.x, pos.y);
+    canvas.style.cursor = hover ? 'pointer' : 'default';
+    return;
+  }
+  
   const dx = pos.x - dragState.startX, dy = pos.y - dragState.startY;
   const c = components.find(c => c.id === dragState.id); if (!c) return;
   const w = canvas.width, h = canvas.height; const x0 = 40, x1 = w-10, y0 = h-30, y1 = 10;
@@ -297,4 +309,8 @@ function appendChat(role, content) {
   div.className = role === 'assistant' ? 'mb-2' : 'mb-2'; div.textContent = `${role}: ${content}`; log.appendChild(div); log.scrollTop = log.scrollHeight;
 }
 
-window.addEventListener('DOMContentLoaded', init);
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

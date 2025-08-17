@@ -23,6 +23,7 @@ body { background: var(--bg); font-family: Roboto, system-ui, -apple-system, Seg
 .btn-primary { background: var(--primary); color: var(--primary-contrast); }
 .btn-tonal { background: var(--tonal-bg); color: var(--tonal-fg); }
 .btn-danger { background: var(--danger-bg); color: var(--danger-fg); }
+.btn:hover { filter: brightness(0.98); }
 .chip { background: #eef2ff; color: var(--tonal-fg); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
 
 /* App grid with sidebar */
@@ -31,6 +32,7 @@ body { background: var(--bg); font-family: Roboto, system-ui, -apple-system, Seg
 .map-list { list-style: none; padding: 0; margin: 0; }
 .map-list li { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
 .map-list li:hover { background: #f3f4f6; }
+.map-list li.active { background: #eef2ff; border-left: 3px solid var(--primary); }
 .map-list .meta { color: var(--muted); font-size: 12px; }
 
 /* Utility */
@@ -51,4 +53,3 @@ body { background: var(--bg); font-family: Roboto, system-ui, -apple-system, Seg
 .border { border: 1px solid var(--border); }
 .rounded { border-radius: 8px; }
 header.appbar { position: sticky; top: 0; z-index: 10; background: #ffffffcc; backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--border); }
-
