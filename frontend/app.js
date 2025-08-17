@@ -34,9 +34,45 @@ async function init() {
   $('logoutSidebar').addEventListener('click', logout);
   $('profileBtn').addEventListener('click', () => alert('Profile coming soon'));
   const guidesBtn = $('guidesBtn'); if (guidesBtn) guidesBtn.addEventListener('click', showGuides);
-  $('newMapBtn').addEventListener('click', () => {
+  $('newMapBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = $('newMenu');
+    if (menu) menu.classList.toggle('hidden');
+  });
+  document.addEventListener('click', () => {
+    const menu = $('newMenu');
+    if (!menu) return;
+    if (!menu.classList.contains('hidden')) menu.classList.add('hidden');
+  });
+  const btnWizard = $('newWizard'); if (btnWizard) btnWizard.addEventListener('click', () => {
     currentMapId = null; components = []; links = []; selectedComponentId = null;
-    $('generatorView').classList.remove('hidden'); $('editorView').classList.add('hidden'); $('guidesView')?.classList.add('hidden');
+    const wiz = $('wizardView'); if (wiz) wiz.classList.remove('hidden');
+    const gen = $('generatorView'); if (gen) gen.classList.add('hidden');
+    const ed = $('editorView'); if (ed) ed.classList.add('hidden');
+    const g = $('guidesView'); if (g) g.classList.add('hidden');
+    $('newMenu')?.classList.add('hidden');
+    renderMap();
+  });
+  const btnGen = $('newGenerator'); if (btnGen) btnGen.addEventListener('click', () => {
+    currentMapId = null; components = []; links = []; selectedComponentId = null;
+    const gen = $('generatorView'); if (gen) gen.classList.remove('hidden');
+    const wiz = $('wizardView'); if (wiz) wiz.classList.add('hidden');
+    const ed = $('editorView'); if (ed) ed.classList.add('hidden');
+    const g = $('guidesView'); if (g) g.classList.add('hidden');
+    $('newMenu')?.classList.add('hidden');
+    renderMap();
+  });
+  const btnBlank = $('newBlank'); if (btnBlank) btnBlank.addEventListener('click', async () => {
+    const name = prompt('New map name:', 'Untitled Map'); if (name === null) return;
+    const res = await fetch(API + '/maps', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ name }) });
+    const data = await res.json(); if (!res.ok) { alert('Create failed'); return; }
+    currentMapId = data.id; components = []; links = []; selectedComponentId = null;
+    const ed = $('editorView'); if (ed) ed.classList.remove('hidden');
+    const wiz = $('wizardView'); if (wiz) wiz.classList.add('hidden');
+    const gen = $('generatorView'); if (gen) gen.classList.add('hidden');
+    const g = $('guidesView'); if (g) g.classList.add('hidden');
+    $('newMenu')?.classList.add('hidden');
+    await populateMaps();
     renderMap();
   });
 

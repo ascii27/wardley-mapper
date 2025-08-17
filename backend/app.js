@@ -347,6 +347,40 @@ app.post('/maps/:id/chat', authenticateToken, async (req, res) => {
   }
 });
 
+// Phase 5b: Wizard AI endpoints
+app.post('/ai/wizard/users-needs', authenticateToken, async (req, res) => {
+  try {
+    const { context } = req.body || {};
+    if (!context) return res.status(400).json({ error: 'context is required' });
+    const out = await suggestUsersNeeds(context);
+    res.json(out);
+  } catch (e) {
+    console.error('users-needs failed:', e); res.status(500).json({ error: 'failed', details: e.message });
+  }
+});
+
+app.post('/ai/wizard/capabilities', authenticateToken, async (req, res) => {
+  try {
+    const { needs } = req.body || {};
+    if (!needs) return res.status(400).json({ error: 'needs is required' });
+    const out = await suggestCapabilities(needs);
+    res.json(out);
+  } catch (e) {
+    console.error('capabilities failed:', e); res.status(500).json({ error: 'failed', details: e.message });
+  }
+});
+
+app.post('/ai/wizard/evolution', authenticateToken, async (req, res) => {
+  try {
+    const { capabilities } = req.body || {};
+    if (!capabilities) return res.status(400).json({ error: 'capabilities is required' });
+    const out = await suggestEvolution(capabilities);
+    res.json(out);
+  } catch (e) {
+    console.error('evolution failed:', e); res.status(500).json({ error: 'failed', details: e.message });
+  }
+});
+
 function clamp01(v) {
   const n = Number(v);
   if (Number.isNaN(n)) return 0.5;
