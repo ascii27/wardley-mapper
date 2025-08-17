@@ -33,52 +33,59 @@
       <div id="genStatus" class="text-sm text-gray-600"></div>
       <canvas id="mapCanvas" width="800" height="400" class="border"></canvas>
     </div>
+    <div class="space-y-2">
+      <h3 class="text-xl font-semibold">Your Maps</h3>
+      <div class="flex gap-2 items-center">
+        <button id="refreshMaps" class="bg-gray-200 px-2">Refresh</button>
+        <select id="mapsSelect" class="border p-1"></select>
+        <span id="mapLoadStatus" class="text-sm text-gray-600"></span>
+      </div>
+    </div>
+    <div class="space-y-2 border-t pt-4">
+      <h3 class="text-xl font-semibold">Edit Components & Links</h3>
+      <div class="flex gap-2 items-center">
+        <input id="newComponentName" class="border p-1" placeholder="New component name" />
+        <button id="addComponent" class="bg-green-600 text-white px-2">Add</button>
+        <button id="deleteComponent" class="bg-red-600 text-white px-2">Delete Selected</button>
+        <label class="ml-4 inline-flex items-center gap-1">
+          <input type="checkbox" id="linkMode" /> Link mode
+        </label>
+        <span id="editStatus" class="text-sm text-gray-600"></span>
+      </div>
+      <div>
+        <h4 class="font-semibold">Links</h4>
+        <ul id="linksList" class="list-disc pl-5 text-sm"></ul>
+      </div>
+    </div>
   </div>
   <script>
     // Use same-origin API when served by Express
     const API = '';
-    const token = localStorage.getItem('token');
 
+    // Session bootstrap
+    const token = localStorage.getItem('token');
     if (token) showDashboard();
 
+    // Auth handlers
     document.getElementById('signupForm').addEventListener('submit', async e => {
       e.preventDefault();
       const username = document.getElementById('signupUsername').value;
       const password = document.getElementById('signupPassword').value;
-      const res = await fetch(API + '/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
+      const res = await fetch(API + '/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
       const data = await res.json();
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        showDashboard();
-      }
+      if (data.token) { localStorage.setItem('token', data.token); showDashboard(); }
     });
-
     document.getElementById('loginForm').addEventListener('submit', async e => {
       e.preventDefault();
       const username = document.getElementById('loginUsername').value;
       const password = document.getElementById('loginPassword').value;
-      const res = await fetch(API + '/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
+      const res = await fetch(API + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
       const data = await res.json();
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        showDashboard();
-      }
+      if (data.token) { localStorage.setItem('token', data.token); showDashboard(); }
     });
-
     document.getElementById('logout').addEventListener('click', async () => {
       const token = localStorage.getItem('token');
-      await fetch(API + '/logout', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
+      await fetch(API + '/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
       localStorage.removeItem('token');
       document.getElementById('dashboard').classList.add('hidden');
       document.getElementById('auth').classList.remove('hidden');
@@ -86,14 +93,21 @@
 
     async function showDashboard() {
       const token = localStorage.getItem('token');
-      const res = await fetch(API + '/dashboard', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
+      const res = await fetch(API + '/dashboard', { headers: { 'Authorization': 'Bearer ' + token } });
       const data = await res.json();
       document.getElementById('welcome').innerText = data.message || 'Logged in';
       document.getElementById('auth').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
+      populateMaps();
     }
+
+    // Global state
+    let currentMapId = null;
+    let components = [];
+    let links = [];
+    let selectedComponentId = null;
+    let dragState = null;
+    let pendingLinkSourceId = null;
 
     document.getElementById('generateMap').addEventListener('click', async () => {
       const prompt = document.getElementById('mapPrompt').value.trim();
@@ -103,64 +117,150 @@
       try {
         const res = await fetch(API + '/ai/generate-map', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + localStorage.getItem('token')
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
           body: JSON.stringify({ prompt })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed');
         status.textContent = `Map generated: ${data.name || ''}`;
-        renderMap(data.components || [], data.links || []);
-      } catch (e) {
-        status.textContent = 'Error: ' + e.message;
-      }
+        currentMapId = data.id;
+        components = (data.components || []).map((c) => ({ ...c }));
+        links = (data.links || []).map((l) => ({ ...l }));
+        populateMaps();
+        renderMap();
+      } catch (e) { status.textContent = 'Error: ' + e.message; }
     });
 
-    function renderMap(components, links) {
+    document.getElementById('refreshMaps').addEventListener('click', populateMaps);
+    document.getElementById('mapsSelect').addEventListener('change', async (e) => {
+      const id = Number(e.target.value); if (!id) return; await loadMap(id);
+    });
+    document.getElementById('addComponent').addEventListener('click', async () => {
+      if (!currentMapId) return;
+      const name = document.getElementById('newComponentName').value.trim(); if (!name) return;
+      const res = await fetch(API + `/maps/${currentMapId}/components`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+        body: JSON.stringify({ name, evolution: 0.5, visibility: 0.5 })
+      });
+      const data = await res.json();
+      if (!res.ok) { document.getElementById('editStatus').textContent = 'Error: ' + (data.error || 'add failed'); return; }
+      components.push(data); document.getElementById('newComponentName').value=''; renderMap();
+    });
+    document.getElementById('deleteComponent').addEventListener('click', async () => {
+      if (!currentMapId || !selectedComponentId) return;
+      await fetch(API + `/maps/${currentMapId}/components/${selectedComponentId}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
+      components = components.filter(c => c.id !== selectedComponentId);
+      links = links.filter(l => l.source_component_id !== selectedComponentId && l.target_component_id !== selectedComponentId);
+      selectedComponentId = null; renderMap();
+    });
+
+    async function populateMaps() {
+      const sel = document.getElementById('mapsSelect');
+      const res = await fetch(API + '/maps', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
+      const data = await res.json();
+      sel.innerHTML = '<option value="">Select a map</option>' + data.map(m => `<option value="${m.id}" ${m.id===currentMapId?'selected':''}>${m.name || 'Untitled'} (#${m.id})</option>`).join('');
+    }
+    async function loadMap(id) {
+      const res = await fetch(API + `/maps/${id}`, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
+      const data = await res.json(); if (!res.ok) return;
+      currentMapId = id; components = (data.components || []).map(c=>({ ...c })); links = (data.links || []).map(l=>({ ...l })); renderMap();
+    }
+
+    function renderMap() {
       const canvas = document.getElementById('mapCanvas');
       const ctx = canvas.getContext('2d');
       const w = canvas.width, h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
       // axes
-      ctx.strokeStyle = '#888';
-      ctx.beginPath();
-      ctx.moveTo(40, 10); ctx.lineTo(40, h-30); // y axis
-      ctx.lineTo(w-10, h-30); // x axis
-      ctx.stroke();
-      ctx.fillStyle = '#444';
-      ctx.fillText('Visibility ↑', 5, 20);
-      ctx.fillText('Evolution →', w-110, h-10);
+      ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(40, 10); ctx.lineTo(40, h-30); ctx.lineTo(w-10, h-30); ctx.stroke();
+      ctx.fillStyle = '#444'; ctx.fillText('Visibility ↑', 5, 20); ctx.fillText('Evolution →', w-110, h-10);
 
-      // map to canvas space
       const x0 = 40, y0 = h-30, x1 = w-10, y1 = 10;
       const toX = (evolution) => x0 + (x1 - x0) * clamp01(evolution);
       const toY = (visibility) => y0 - (y0 - y1) * clamp01(visibility);
 
-      // Draw links first
+      // links
       ctx.strokeStyle = '#aaa';
       for (const l of links) {
         const from = components.find(c => c.id === l.source_component_id) || components.find(c => c.name === l.from);
         const to = components.find(c => c.id === l.target_component_id) || components.find(c => c.name === l.to);
         if (!from || !to) continue;
-        const fx = toX(from.evolution), fy = toY(from.visibility);
-        const tx = toX(to.evolution), ty = toY(to.visibility);
-        ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(toX(from.evolution), toY(from.visibility)); ctx.lineTo(toX(to.evolution), toY(to.visibility)); ctx.stroke();
       }
-
-      // Draw components
+      // components
       for (const c of components) {
         const x = toX(c.evolution), y = toY(c.visibility);
-        ctx.fillStyle = '#2563eb';
-        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#111';
-        ctx.fillText(c.name, x + 6, y - 6);
+        ctx.fillStyle = (c.id === selectedComponentId) ? '#f59e0b' : '#2563eb';
+        ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#111'; ctx.fillText(c.name, x + 8, y - 8);
       }
+
+      // Links list UI
+      const list = document.getElementById('linksList');
+      list.innerHTML = '';
+      links.forEach((l) => {
+        const from = components.find(c => c.id === l.source_component_id) || { name: l.from };
+        const to = components.find(c => c.id === l.target_component_id) || { name: l.to };
+        const li = document.createElement('li');
+        li.textContent = `${from.name} → ${to.name}`;
+        const btn = document.createElement('button'); btn.textContent = 'Delete'; btn.className = 'ml-2 text-red-600 underline';
+        btn.addEventListener('click', async () => {
+          if (!currentMapId || !l.id) return;
+          await fetch(API + `/maps/${currentMapId}/links/${l.id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
+          links = links.filter(x => x !== l); renderMap();
+        });
+        li.appendChild(btn); list.appendChild(li);
+      });
     }
 
     function clamp01(v){ const n = Number(v); if (Number.isNaN(n)) return 0.5; return Math.max(0, Math.min(1, n)); }
+
+    // Canvas interactions (select, drag, link mode)
+    const canvas = document.getElementById('mapCanvas');
+    canvas.addEventListener('mousedown', (e) => {
+      const pos = getMousePos(canvas, e); const hit = hitTest(pos.x, pos.y);
+      if (hit) { selectedComponentId = hit.id; dragState = { id: hit.id, startX: pos.x, startY: pos.y }; renderMap(); }
+      else { selectedComponentId = null; dragState = null; renderMap(); }
+    });
+    canvas.addEventListener('mousemove', (e) => {
+      if (!dragState) return; const pos = getMousePos(canvas, e);
+      const dx = pos.x - dragState.startX, dy = pos.y - dragState.startY;
+      const c = components.find(c => c.id === dragState.id); if (!c) return;
+      const w = canvas.width, h = canvas.height; const x0 = 40, x1 = w-10, y0 = h-30, y1 = 10;
+      const toPixX = (e) => x0 + (x1 - x0) * clamp01(e); const toPixY = (v) => y0 - (y0 - y1) * clamp01(v);
+      const fromPixX = toPixX(c.evolution) + dx; const fromPixY = toPixY(c.visibility) + dy;
+      c.evolution = clamp01((fromPixX - x0) / (x1 - x0)); c.visibility = clamp01(1 - (fromPixY - y1) / (y0 - y1));
+      dragState.startX = pos.x; dragState.startY = pos.y; renderMap();
+    });
+    canvas.addEventListener('mouseup', async () => {
+      if (dragState) {
+        const c = components.find(c => c.id === dragState.id);
+        if (c && currentMapId) {
+          await fetch(API + `/maps/${currentMapId}/components/${c.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') }, body: JSON.stringify({ evolution: c.evolution, visibility: c.visibility }) });
+        }
+      }
+      dragState = null;
+    });
+    canvas.addEventListener('click', async (e) => {
+      const pos = getMousePos(canvas, e); const hit = hitTest(pos.x, pos.y); const linkMode = document.getElementById('linkMode').checked;
+      if (linkMode && hit) {
+        if (pendingLinkSourceId == null) { pendingLinkSourceId = hit.id; document.getElementById('editStatus').textContent = `Link source: ${components.find(c=>c.id===hit.id)?.name}`; }
+        else if (pendingLinkSourceId !== hit.id) {
+          const sourceId = pendingLinkSourceId, targetId = hit.id; pendingLinkSourceId = null;
+          const res = await fetch(API + `/maps/${currentMapId}/links`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') }, body: JSON.stringify({ sourceId, targetId }) });
+          const data = await res.json(); if (res.ok) { links.push(data); document.getElementById('editStatus').textContent = 'Link created'; renderMap(); }
+          else { document.getElementById('editStatus').textContent = 'Error: ' + (data.error || 'link failed'); }
+        }
+      }
+    });
+    function getMousePos(canvas, evt) { const r = canvas.getBoundingClientRect(); return { x: evt.clientX - r.left, y: evt.clientY - r.top }; }
+    function hitTest(x, y) {
+      const w = canvas.width, h = canvas.height; const x0 = 40, x1 = w-10, y0 = h-30, y1 = 10;
+      const toPixX = (e) => x0 + (x1 - x0) * clamp01(e); const toPixY = (v) => y0 - (y0 - y1) * clamp01(v);
+      for (const c of components) { const cx = toPixX(c.evolution), cy = toPixY(c.visibility); const d2=(x-cx)*(x-cx)+(y-cy)*(y-cy); if (d2<=8*8) return c; }
+      return null;
+    }
   </script>
 </body>
 </html>

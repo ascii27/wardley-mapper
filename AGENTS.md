@@ -38,3 +38,8 @@
 - API: `POST /ai/generate-map` expects `{ prompt }`, uses OpenAI with a strict JSON system prompt, validates and saves output.
 - Schema additions: `maps.prompt`, component coordinates (`evolution`, `visibility`), and a `links` table.
 - Frontend: Adds a prompt textarea in the dashboard and renders a simple canvas map.
+
+## Phase 3 Notes
+- Interactive canvas: select and drag components to update positions (saves on mouseup).
+- Editing: add/delete components; link mode to create links via two clicks; list to delete links.
+- API added: `POST /maps/:id/components`, `PATCH /maps/:id/components/:componentId`, `DELETE /maps/:id/components/:componentId`, `POST /maps/:id/links`, `DELETE /maps/:id/links/:linkId`.
