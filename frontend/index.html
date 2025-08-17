@@ -57,6 +57,13 @@
           <h3 class="text-lg font-semibold">Maps</h3>
           <button id="newMapBtn" class="btn btn-primary"><span class="material-symbols-outlined">add</span>New</button>
         </div>
+        <div id="newMenu" class="hidden border rounded p-2 bg-white mb-2">
+          <div class="flex flex-col gap-2">
+            <button id="newWizard" class="btn btn-tonal w-full"><span class="material-symbols-outlined">auto_mode</span>Use Wizard</button>
+            <button id="newGenerator" class="btn btn-tonal w-full"><span class="material-symbols-outlined">sparkles</span>AI Generator</button>
+            <button id="newBlank" class="btn btn-tonal w-full"><span class="material-symbols-outlined">post_add</span>Blank Map</button>
+          </div>
+        </div>
         <input id="mapSearch" class="border p-2 rounded w-full mb-2" placeholder="Search maps..." />
         <ul id="mapsList" class="map-list"></ul>
         <hr class="my-4" />
@@ -65,6 +72,10 @@
         <button id="logoutSidebar" class="btn btn-tonal w-full"><span class="material-symbols-outlined">logout</span>Logout</button>
       </aside>
       <section class="main">
+        <div id="wizardView" class="hidden card p-4 space-y-2">
+          <h3 class="text-xl font-semibold">Guided Map Creator (scaffold)</h3>
+          <p class="text-sm text-gray-700">AI-assisted steps to capture Users, Needs, Capabilities, and placement. UI coming next.</p>
+        </div>
         <div id="generatorView" class="card p-4 space-y-3">
           <h3 class="text-xl font-semibold">Generate Map from Prompt</h3>
           <textarea id="mapPrompt" class="w-full border p-2 rounded" rows="3" placeholder="Describe the system or problem space..."></textarea>

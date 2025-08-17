@@ -80,6 +80,45 @@ function clamp01(v) {
 }
 
 module.exports = { generateMapFromPrompt };
+// Phase 5b wizard suggester functions
+async function callOpenAI(messages, fetchImpl = fetch) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('Missing OPENAI_API_KEY');
+  const resp = await fetchImpl('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.2, messages })
+  });
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`OpenAI error: ${resp.status} ${txt}`);
+  }
+  const data = await resp.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  return extractJson(content);
+}
+
+async function suggestUsersNeeds(contextText, fetchImpl = fetch) {
+  const sys = 'Return ONLY JSON { users:[string], needs:[{ name:string, forUser:string }] }.';
+  const user = `Context: ${contextText}\nList primary users and their explicit needs.`;
+  return callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }], fetchImpl);
+}
+
+async function suggestCapabilities(needsJson, fetchImpl = fetch) {
+  const sys = 'Return ONLY JSON { capabilities:[{ name:string }], links:[{ need:string, capability:string }] }.';
+  const user = `Given these needs: ${JSON.stringify(needsJson)} propose capabilities and Need->Capability links.`;
+  return callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }], fetchImpl);
+}
+
+async function suggestEvolution(capabilitiesJson, fetchImpl = fetch) {
+  const sys = 'Return ONLY JSON [{ name:string, stage:number(1..4), rationale:string }] based on Wardley evolution (Genesis, Custom, Product, Commodity).';
+  const user = `Capabilities: ${JSON.stringify(capabilitiesJson)}. Suggest stage 1..4 per item with a short rationale.`;
+  return callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }], fetchImpl);
+}
+
+module.exports.suggestUsersNeeds = suggestUsersNeeds;
+module.exports.suggestCapabilities = suggestCapabilities;
+module.exports.suggestEvolution = suggestEvolution;
 // Phase 4 chat utilities
 const CHAT_SYSTEM_PROMPT = `You are a Wardley mapping copilot. Respond with STRICT JSON only:
 {

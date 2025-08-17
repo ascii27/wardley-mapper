@@ -9,6 +9,7 @@ require('dotenv').config();
 const db = require('./db');
 const { generateMapFromPrompt } = require('./ai');
 const { chatOnMap } = require('./ai');
+const { suggestUsersNeeds, suggestCapabilities, suggestEvolution } = require('./ai');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -130,6 +131,15 @@ app.get('/maps', authenticateToken, async (req, res) => {
   const maps = await db.query('SELECT id, name, prompt FROM maps WHERE user_id=$1 ORDER BY id DESC LIMIT 20', [req.user.id]);
   res.json(maps.rows);
 });
+// Create map (for wizard flow)
+app.post('/maps', authenticateToken, async (req, res) => {
+  const { name, description } = req.body || {};
+  const nm = (name || "Untitled Map").toString();
+  const desc = description ? description.toString() : null;
+  const ins = await db.query('INSERT INTO maps (user_id, name, description, updated_at) VALUES ($1, $2, $3, NOW()) RETURNING id, name, description, created_at, updated_at', [req.user.id, nm, desc]);
+  res.status(201).json(ins.rows[0]);
+});
+
 
 app.get('/maps/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
