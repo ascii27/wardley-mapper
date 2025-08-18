@@ -1,136 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wardley Mapper</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header class="w-full border-b bg-white/80 backdrop-blur appbar">
-    <div class="container flex items-center justify-between px-4 py-3">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-blue-600">map</span>
-        <h1 class="text-xl font-medium">Wardley Mapper</h1>
+  <div id="app">
+    <nav class="navbar navbar-light bg-light mb-4">
+      <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">Wardley Mapper</span>
+        <button class="btn btn-outline-primary" v-if="user" @click="logout">Logout</button>
       </div>
-      <button id="logoutBtn" class="btn btn-tonal hidden"><span class="material-symbols-outlined">logout</span>Logout</button>
-    </div>
-  </header>
-  <main class="container px-4 py-4">
-    <div id="auth" class="space-y-6">
-      <div class="card p-4">
-        <h2 class="text-xl font-semibold mb-2">Understand, Strategize, Decide — with Wardley Maps</h2>
-        <div class="prose">
-          <p>Wardley maps visualize your landscape: users, components, dependencies, and evolution. Use them to spot inertia, guide investment, and make confident decisions.</p>
-          <ul class="list-disc pl-5">
-            <li>Describe a system to generate a first map.</li>
-            <li>Drag components to refine positions and links.</li>
-            <li>Chat with AI for analysis and next steps.</li>
-          </ul>
-          <p>Learn more: <a class="text-blue-600 underline" href="https://wardleymaps.com/" target="_blank" rel="noopener">wardleymaps.com</a> ·
-          <a class="text-blue-600 underline" href="https://www.youtube.com/results?search_query=wardley+maps" target="_blank" rel="noopener">YouTube talks</a> ·
-          <a class="text-blue-600 underline" href="https://leadingedgeforum.com/research/wardley-maps/" target="_blank" rel="noopener">LEF intro</a></p>
-        </div>
-      </div>
-      <div class="grid md:grid-cols-2 gap-6">
-        <form id="signupForm" class="space-y-3 card p-4">
-          <h2 class="text-xl">Sign Up</h2>
-          <input class="border p-2 rounded" type="text" id="signupUsername" placeholder="Username" required>
-          <input class="border p-2 rounded" type="password" id="signupPassword" placeholder="Password" required>
-          <button class="btn btn-primary" type="submit"><span class="material-symbols-outlined">person_add</span>Sign Up</button>
-        </form>
-        <form id="loginForm" class="space-y-3 card p-4">
-          <h2 class="text-xl">Login</h2>
-          <input class="border p-2 rounded" type="text" id="loginUsername" placeholder="Username" required>
-          <input class="border p-2 rounded" type="password" id="loginPassword" placeholder="Password" required>
-          <button class="btn btn-primary" type="submit"><span class="material-symbols-outlined">login</span>Login</button>
-        </form>
-      </div>
-    </div>
+    </nav>
 
-    <div id="app" class="hidden app-grid">
-      <aside class="sidebar card p-4">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-lg font-semibold">Maps</h3>
-          <button id="newMapBtn" class="btn btn-primary"><span class="material-symbols-outlined">add</span>New</button>
-        </div>
-        <input id="mapSearch" class="border p-2 rounded w-full mb-2" placeholder="Search maps..." />
-        <ul id="mapsList" class="map-list"></ul>
-        <hr class="my-4" />
-        <button id="guidesBtn" class="btn btn-tonal w-full mb-2"><span class="material-symbols-outlined">menu_book</span>Guides</button>
-        <button id="profileBtn" class="btn btn-tonal w-full mb-2"><span class="material-symbols-outlined">account_circle</span>Profile</button>
-        <button id="logoutSidebar" class="btn btn-tonal w-full"><span class="material-symbols-outlined">logout</span>Logout</button>
-      </aside>
-      <section class="main">
-        <div id="generatorView" class="card p-4 space-y-3">
-          <h3 class="text-xl font-semibold">Generate Map from Prompt</h3>
-          <textarea id="mapPrompt" class="w-full border p-2 rounded" rows="3" placeholder="Describe the system or problem space..."></textarea>
-          <button id="generateMap" class="btn btn-primary"><span class="material-symbols-outlined">auto_awesome</span>Generate</button>
-          <div id="genStatus" class="text-sm text-gray-600"></div>
-        </div>
-        <div id="editorView" class="hidden space-y-4">
-          <div class="card p-4 space-y-2">
-            <div class="flex items-center justify-between">
-              <h3 id="mapTitle" class="text-xl font-semibold">Map</h3>
-              <span id="mapUpdated" class="chip"></span>
-            </div>
-            <canvas id="mapCanvas" width="960" height="460" class="border rounded w-full"></canvas>
+    <div class="container">
+      <div v-if="!user">
+        <div class="row">
+          <div class="col-md-6 mb-4">
+            <h2>Sign Up</h2>
+            <form @submit.prevent="signup">
+              <div class="mb-3">
+                <input v-model="signupForm.username" class="form-control" placeholder="Username" required>
+              </div>
+              <div class="mb-3">
+                <input v-model="signupForm.password" type="password" class="form-control" placeholder="Password" required>
+              </div>
+              <button type="submit" class="btn btn-primary">Sign Up</button>
+            </form>
           </div>
-          <div class="card p-4 space-y-3">
-            <h4 class="font-semibold">Edit Components & Links</h4>
-            <div class="flex gap-2 items-center">
-              <input id="newComponentName" class="border p-2 rounded" placeholder="New component name" />
-              <button id="addComponent" class="btn btn-tonal"><span class="material-symbols-outlined">add_circle</span>Add</button>
-              <button id="deleteComponent" class="btn btn-danger"><span class="material-symbols-outlined">delete</span>Delete Selected</button>
-              <label class="ml-4 inline-flex items-center gap-1">
-                <input type="checkbox" id="linkMode" /> Link mode
-              </label>
-              <span id="editStatus" class="text-sm text-gray-600"></span>
-            </div>
-            <div>
-              <h4 class="font-semibold">Links</h4>
-              <ul id="linksList" class="list-disc pl-5 text-sm"></ul>
-            </div>
-          </div>
-          <div class="card p-4 space-y-3">
-            <h3 class="text-xl font-semibold">AI Chat</h3>
-            <div id="chatLog" class="border p-2 h-64 overflow-y-auto bg-gray-50 text-sm rounded"></div>
-            <div class="flex gap-2 mt-2">
-              <input id="chatInput" class="flex-1 border p-2 rounded" placeholder="Ask the AI about this map..." />
-              <button id="sendChat" class="btn btn-primary"><span class="material-symbols-outlined">send</span>Send</button>
-            </div>
-            <div id="chatStatus" class="text-sm text-gray-600 mt-1"></div>
+          <div class="col-md-6 mb-4">
+            <h2>Login</h2>
+            <form @submit.prevent="login">
+              <div class="mb-3">
+                <input v-model="loginForm.username" class="form-control" placeholder="Username" required>
+              </div>
+              <div class="mb-3">
+                <input v-model="loginForm.password" type="password" class="form-control" placeholder="Password" required>
+              </div>
+              <button type="submit" class="btn btn-success">Login</button>
+            </form>
           </div>
         </div>
-        <div id="guidesView" class="hidden card p-4">
-          <h3 class="text-xl font-semibold mb-2">Guides: Wardley Mapping</h3>
-          <div class="prose">
-            <h4>What is a Wardley Map?</h4>
-            <p>A Wardley Map is a visual model of a system showing the value chain (Y axis: visibility to users) and evolution (X axis: from genesis to commodity). It helps you reason about strategy and movement.</p>
-            <h4>How to Create</h4>
-            <ul class="list-disc pl-5">
-              <li>Define users and their needs (top of value chain).</li>
-              <li>List components that fulfill those needs.</li>
-              <li>Place components by evolution (X) and visibility (Y).</li>
-              <li>Connect components to show dependencies.</li>
-            </ul>
-            <h4>How to Use</h4>
-            <ul class="list-disc pl-5">
-              <li>Identify duplication, inertia, and opportunities.</li>
-              <li>Choose plays (e.g., build vs buy, open vs proprietary).</li>
-              <li>Track movement over time to inform decisions.</li>
-            </ul>
-            <p>Deep dives: <a class="text-blue-600 underline" href="https://wardleypedia.org/" target="_blank" rel="noopener">Wardleypedia</a> ·
-            <a class="text-blue-600 underline" href="https://www.youtube.com/results?search_query=wardley+maps" target="_blank" rel="noopener">YouTube</a> ·
-            <a class="text-blue-600 underline" href="https://medium.com/wardleymaps" target="_blank" rel="noopener">Wardley Maps on Medium</a></p>
+      </div>
+
+      <div v-else>
+        <div class="mb-4">
+          <h2 class="h4">Generate Map from Prompt</h2>
+          <div class="mb-3">
+            <textarea v-model="prompt" class="form-control" rows="3" placeholder="Describe the system..."></textarea>
           </div>
+          <button class="btn btn-primary" @click="generate">Generate</button>
+          <div class="text-muted small mt-2">{{ genStatus }}</div>
         </div>
-      </section>
+
+        <div v-if="currentMap">
+          <h3 class="h5">{{ currentMap.name || 'Map' }}</h3>
+          <canvas id="mapCanvas" width="960" height="460" class="map-canvas w-100"></canvas>
+        </div>
+
+        <div class="mt-4">
+          <h3 class="h5">Your Maps</h3>
+          <ul class="list-group">
+            <li v-for="m in maps" :key="m.id" class="list-group-item d-flex justify-content-between align-items-center">
+              <span role="button" @click="loadMap(m)">{{ m.name || 'Untitled' }}</span>
+              <button class="btn btn-sm btn-danger" @click="deleteMap(m)">Delete</button>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
-  </main>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
