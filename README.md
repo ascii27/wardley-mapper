@@ -31,12 +31,12 @@ Visit http://localhost:3000 to use the app (Express serves the `frontend/` direc
 
 ## Frontend
 
-- Served by the Express server from `frontend/`.
-- The client makes same-origin API calls; no separate static hosting is needed.
+- Vue 3 single-page application styled with Bootstrap 5.
+- Served by the Express server from `frontend/` with same-origin API calls.
 - Frontend assets:
-  - `frontend/index.html` (layout with sidebar + views)
-  - `frontend/app.js` (interactive logic, canvas, chat, map CRUD)
-  - `frontend/styles.css` (lightweight styles and layout)
+  - `frontend/index.html` (Vue + Bootstrap entry)
+  - `frontend/app.js` (SPA logic and routing)
+  - `frontend/styles.css` (custom tweaks for sidebar and landing page)
 
 ## Phase 2: AI Map Generation
 - Endpoint: `POST /ai/generate-map` (auth required) with `{ "prompt": "..." }`.
