@@ -11,6 +11,8 @@ let pendingLinkSourceId = null;
 let sessionId = null;
 let mapsList = [];
 let wizardStep = 1;
+let wizardCapabilities = [];
+let wizardNeedCapLinks = [];
 
 // DOM helpers
 function $(id) { return document.getElementById(id); }
@@ -56,6 +58,8 @@ async function init() {
     const ed = $('editorView'); if (ed) ed.classList.add('hidden');
     const g = $('guidesView'); if (g) g.classList.add('hidden');
     $('newMenu')?.classList.add('hidden');
+    // populate need-for-user select from any current users
+    updateNeedForUserOptions(); renderWizardLinks(); renderWizardCapabilities();
     renderMap();
   });
   const btnGen = $('newGenerator'); if (btnGen) btnGen.addEventListener('click', () => {
@@ -91,6 +95,23 @@ async function init() {
   const wizAiUsers = $('wizAiUsers'); if (wizAiUsers) wizAiUsers.addEventListener('click', aiSuggestUsersNeeds);
   const wizAiCaps = $('wizAiCaps'); if (wizAiCaps) wizAiCaps.addEventListener('click', aiSuggestCapabilities);
   const wizAiEvo = $('wizAiEvo'); if (wizAiEvo) wizAiEvo.addEventListener('click', aiSuggestEvolution);
+  const addCapBtn = $('addCapBtn'); if (addCapBtn) addCapBtn.addEventListener('click', () => {
+    const name = $('wizCapInput').value.trim(); if (!name) return; const stage = Number($('wizCapStage').value || 3);
+    wizardCapabilities.push({ name, stage, rationale: '', delta_evolution: null, delta_visibility: null }); $('wizCapInput').value = ''; renderWizardCapabilities();
+  });
+  const addLinkBtn = $('addLinkBtn'); if (addLinkBtn) addLinkBtn.addEventListener('click', () => {
+    const need = $('linkNeedSelect').value; const cap = $('linkCapSelect').value; if (!need || !cap) return alert('Select need and capability');
+    wizardNeedCapLinks.push({ need, capability: cap }); renderWizardLinks(); renderWizardPreview();
+  });
+  // wizard add user/need buttons
+  const addUserBtn = $('addUserBtn'); if (addUserBtn) addUserBtn.addEventListener('click', () => {
+    const input = $('wizUserInput'); if (!input) return; const v = input.value.trim(); if (!v) return; const list = $('wizUsersList'); const li = document.createElement('li'); li.dataset.name = v; li.textContent = v; const btn = document.createElement('button'); btn.textContent = 'Delete'; btn.className='btn btn-tonal p-1 ml-2'; btn.addEventListener('click', () => { li.remove(); updateNeedForUserOptions(); }); li.appendChild(btn); list.appendChild(li); input.value=''; updateNeedForUserOptions(); });
+  const addNeedBtn = $('addNeedBtn'); if (addNeedBtn) addNeedBtn.addEventListener('click', () => {
+    const name = $('wizNeedName').value.trim(); const forUser = $('wizNeedForUser').value; if (!name) return alert('Need name required');
+    const list = $('wizNeedsList'); const li = document.createElement('li'); li.dataset.name = name; li.dataset.forUser = forUser; li.textContent = `${name} (for ${forUser || '—'})`;
+    const btn = document.createElement('button'); btn.textContent = 'Delete'; btn.className='btn btn-tonal p-1 ml-2'; btn.addEventListener('click', () => { li.remove(); }); li.appendChild(btn); list.appendChild(li);
+    $('wizNeedName').value='';
+  });
 
 
   // Auth forms
@@ -472,10 +493,161 @@ async function aiSuggestUsersNeeds() {
     const context = $('wizContext').value.trim(); if (!context) return alert('Please provide context.');
     const res = await fetch(API + '/ai/wizard/users-needs', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ context }) });
     const data = await res.json(); if (!res.ok) return alert('AI failed: ' + (data.error||''));
-    if (Array.isArray(data.users)) $('wizUsers').value = JSON.stringify(data.users, null, 2);
-    if (Array.isArray(data.needs)) $('wizNeeds').value = JSON.stringify(data.needs, null, 2);
+    if (Array.isArray(data.users)) setWizardUsers(data.users);
+    if (Array.isArray(data.needs)) setWizardNeeds(data.needs);
   } catch (e) { alert('AI error'); }
 }
+
+// Wizard UI helpers for Users and Needs
+function getWizardUsers() {
+  const list = $('wizUsersList'); const out = [];
+  if (!list) return out;
+  for (const li of list.children) out.push(li.dataset.name);
+  return out;
+}
+function setWizardUsers(users) {
+  const list = $('wizUsersList'); if (!list) return;
+  list.innerHTML = '';
+  const select = $('wizNeedForUser'); select.innerHTML = '<option value="">-- for user --</option>';
+  for (const u of users) {
+    const li = document.createElement('li'); li.dataset.name = u;
+    const span = document.createElement('span'); span.className='wiz-item-name'; span.textContent = u; span.title = 'Double-click to edit';
+    span.addEventListener('dblclick', () => { span.contentEditable = 'true'; span.focus(); });
+    span.addEventListener('blur', () => {
+      const old = li.dataset.name; const nv = span.textContent.trim(); if (!nv) { span.textContent = old; span.contentEditable = 'false'; return; }
+      if (nv === old) { span.contentEditable = 'false'; return; }
+      // update name and update any needs referencing this user
+      li.dataset.name = nv; span.contentEditable = 'false'; updateNeedForUserOptions(old, nv);
+    });
+    const btn = document.createElement('button'); btn.textContent = 'Delete'; btn.className = 'btn btn-tonal p-1 ml-2'; btn.addEventListener('click', () => { li.remove(); updateNeedForUserOptions(); renderWizardLinks(); renderWizardPreview(); });
+    li.appendChild(span); li.appendChild(btn); list.appendChild(li);
+    const opt = document.createElement('option'); opt.value = u; opt.textContent = u; select.appendChild(opt);
+  }
+  renderWizardPreview();
+}
+
+function getWizardNeeds() {
+  const list = $('wizNeedsList'); const out = [];
+  if (!list) return out;
+  for (const li of list.children) {
+    out.push({ name: li.dataset.name, forUser: li.dataset.forUser });
+  }
+  return out;
+}
+function setWizardNeeds(needs) {
+  const list = $('wizNeedsList'); if (!list) return;
+  list.innerHTML = '';
+  for (const n of needs) {
+    const li = document.createElement('li'); li.dataset.name = n.name; li.dataset.forUser = n.forUser || '';
+    const span = document.createElement('span'); span.className='wiz-item-name'; span.textContent = n.name; span.title='Double-click to edit';
+    span.addEventListener('dblclick', () => { span.contentEditable = 'true'; span.focus(); });
+    span.addEventListener('blur', () => { const old = li.dataset.name; const nv = span.textContent.trim(); if (!nv) { span.textContent = old; span.contentEditable='false'; return; } if (nv===old) { span.contentEditable='false'; return; } li.dataset.name = nv; span.contentEditable='false'; renderWizardLinks(); renderWizardPreview(); });
+    const meta = document.createElement('span'); meta.className='ml-2 text-sm text-gray-600'; meta.textContent = `(for ${n.forUser || '—'})`;
+    const btn = document.createElement('button'); btn.textContent = 'Delete'; btn.className = 'btn btn-tonal p-1 ml-2'; btn.addEventListener('click', () => { li.remove(); renderWizardLinks(); renderWizardPreview(); updateNeedForUserOptions(); });
+    li.appendChild(span); li.appendChild(meta); li.appendChild(btn); list.appendChild(li);
+  }
+  renderWizardPreview();
+}
+
+function getWizardCapabilities() { return wizardCapabilities.slice(); }
+function setWizardCapabilities(caps) {
+  wizardCapabilities = (caps || []).map(c => ({ name: c.name, stage: c.stage || 3, rationale: c.rationale || '', delta_evolution: c.delta_evolution ?? null, delta_visibility: c.delta_visibility ?? null }));
+  renderWizardCapabilities();
+}
+
+function renderWizardCapabilities() {
+  const list = $('wizCapsList'); if (list) { list.innerHTML = ''; wizardCapabilities.forEach((c, i) => {
+    const li = document.createElement('li'); li.dataset.idx = i;
+    const span = document.createElement('span'); span.className='wiz-item-name'; span.textContent = c.name; span.title='Double-click to edit';
+    span.addEventListener('dblclick', () => { span.contentEditable='true'; span.focus(); });
+    span.addEventListener('blur', () => { const old = c.name; const nv = span.textContent.trim(); if (!nv) { span.textContent = old; span.contentEditable='false'; return; } if (nv===old) { span.contentEditable='false'; return; } wizardCapabilities[i].name = nv; wizardNeedCapLinks = wizardNeedCapLinks.map(l => ({ need: l.need, capability: l.capability === old ? nv : l.capability })); span.contentEditable='false'; renderWizardLinks(); renderWizardCapabilities(); renderWizardPreview(); });
+    const btn = document.createElement('button'); btn.textContent = 'Delete'; btn.className='btn btn-tonal p-1 ml-2'; btn.addEventListener('click', () => { wizardCapabilities.splice(i,1); renderWizardCapabilities(); renderWizardLinks(); renderWizardPreview(); });
+    li.appendChild(span); li.appendChild(document.createTextNode(` (stage ${c.stage}) `)); li.appendChild(btn); list.appendChild(li);
+  }); }
+  // stages view
+  const stages = $('wizCapsStages'); if (stages) { stages.innerHTML = ''; wizardCapabilities.forEach((c, i) => {
+    const li = document.createElement('li'); const sel = document.createElement('select'); sel.className='border p-1 rounded mr-2'; [1,2,3,4].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=`Stage ${s}`; if(s===c.stage) o.selected=true; sel.appendChild(o); });
+    sel.addEventListener('change', () => { c.stage = Number(sel.value); renderWizardCapabilities(); renderWizardPreview(); });
+    const rationale = document.createElement('input'); rationale.className='border p-1 rounded ml-2 w-64'; rationale.placeholder='Rationale (AI hint shown below)'; rationale.value = c.rationale || ''; rationale.addEventListener('input', () => { c.rationale = rationale.value; });
+    const hint = document.createElement('div'); hint.className='text-sm text-gray-500 ml-2'; hint.textContent = c.rationale ? `AI: ${c.rationale}` : '';
+    li.appendChild(document.createTextNode(c.name + ' ')); li.appendChild(sel); li.appendChild(rationale); li.appendChild(hint); stages.appendChild(li);
+  }); }
+  // deltas view
+  const deltas = $('wizCapsDeltas'); if (deltas) { deltas.innerHTML = ''; wizardCapabilities.forEach((c, i) => {
+    const li = document.createElement('li'); const de = document.createElement('input'); de.type='number'; de.step='0.01'; de.min='-0.3'; de.max='0.3'; de.className='border p-1 rounded w-24 mr-2'; de.placeholder='Δevo'; de.value = c.delta_evolution ?? '';
+    de.addEventListener('change', () => { const v = Number(de.value); c.delta_evolution = Number.isNaN(v) ? null : v; renderWizardPreview(); });
+    const dv = document.createElement('input'); dv.type='number'; dv.step='0.01'; dv.min='-0.3'; dv.max='0.3'; dv.className='border p-1 rounded w-24 mr-2'; dv.placeholder='Δvis'; dv.value = c.delta_visibility ?? '';
+    dv.addEventListener('change', () => { const v = Number(dv.value); c.delta_visibility = Number.isNaN(v) ? null : v; renderWizardPreview(); });
+    li.appendChild(document.createTextNode(c.name + ' ')); li.appendChild(de); li.appendChild(dv); deltas.appendChild(li);
+  }); }
+  renderWizardPreview();
+}
+
+function updateNeedForUserOptions(oldName, newName) {
+  const select = $('wizNeedForUser'); if (!select) return; select.innerHTML = '<option value="">-- for user --</option>';
+  const users = getWizardUsers(); for (const u of users) { const opt = document.createElement('option'); opt.value = u; opt.textContent = u; select.appendChild(opt); }
+  if (oldName !== undefined) {
+    // update existing needs that referenced the old user
+    const list = $('wizNeedsList'); if (!list) return;
+    for (const li of list.children) {
+      if (li.dataset.forUser === oldName) {
+        li.dataset.forUser = newName || '';
+        const meta = li.querySelector('.text-sm'); if (meta) meta.textContent = `(for ${li.dataset.forUser || '—'})`;
+      }
+    }
+  }
+}
+
+function renderWizardLinks() {
+  const list = $('wizLinksList'); if (!list) return; list.innerHTML = '';
+  wizardNeedCapLinks.forEach((l, i) => {
+    const li = document.createElement('li'); li.textContent = `${l.need} → ${l.capability}`;
+    const btn = document.createElement('button'); btn.textContent = 'Delete'; btn.className='btn btn-tonal p-1 ml-2'; btn.addEventListener('click', () => { wizardNeedCapLinks.splice(i,1); renderWizardLinks(); renderWizardPreview(); });
+    li.appendChild(btn); list.appendChild(li);
+  });
+  const needSel = $('linkNeedSelect'); const capSel = $('linkCapSelect'); if (needSel && capSel) {
+    needSel.innerHTML = '<option value="">-- need --</option>'; capSel.innerHTML = '<option value="">-- capability --</option>';
+    const needs = getWizardNeeds(); needs.forEach(n => { const o = document.createElement('option'); o.value = n.name; o.textContent = n.name; needSel.appendChild(o); });
+    wizardCapabilities.forEach(c => { const o = document.createElement('option'); o.value = c.name; o.textContent = c.name; capSel.appendChild(o); });
+  }
+}
+
+// addLinkBtn listener is attached in init()
+
+function renderWizardPreview() {
+  const canvas = $('wizPreviewCanvas'); if (!canvas) return; const ctx = canvas.getContext('2d'); const w = canvas.width; const h = canvas.height; ctx.clearRect(0,0,w,h);
+  // axes
+  ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(40, 10); ctx.lineTo(40, h-30); ctx.lineTo(w-10, h-30); ctx.stroke();
+  ctx.setLineDash([4,4]); [0.25,0.5,0.75].forEach(p=>{ const x = 40 + (w-50)*p; ctx.strokeStyle='#ddd'; ctx.beginPath(); ctx.moveTo(x,h-30); ctx.lineTo(x,10); ctx.stroke(); }); ctx.setLineDash([]);
+  // threshold
+  ctx.setLineDash([2,4]); ctx.strokeStyle='#bbb'; ctx.beginPath(); ctx.moveTo(40, 50); ctx.lineTo(w-10, 50); ctx.stroke(); ctx.setLineDash([]);
+  const toX = (e) => 40 + (w-50)*clamp01(e);
+  const toY = (v) => (h-30) - (h-40)*clamp01(v);
+  // draw users (top area)
+  let ux = 60;
+  getWizardUsers().forEach(u => { ctx.fillStyle = '#7c3aed'; ctx.beginPath(); const x = ux, y = 30; ctx.moveTo(x, y-6); ctx.lineTo(x+6,y); ctx.lineTo(x,y+6); ctx.lineTo(x-6,y); ctx.closePath(); ctx.fill(); ctx.fillStyle='#111'; ctx.fillText(u, x+10, y+4); ux += 120; });
+  // draw needs
+  let nx = 60;
+  getWizardNeeds().forEach(n => { ctx.fillStyle = '#059669'; const x = nx, y = 70; roundRect(ctx, x-12, y-8, 90, 20, 5); ctx.fill(); ctx.fillStyle='#fff'; ctx.fillText(n.name, x-8, y+6); nx += 140; });
+  // draw capabilities
+  const caps = getWizardCapabilities(); caps.forEach((c, i) => {
+    const evo = stageToEvolution(c.stage || 3);
+    const vis = 0.6; const x = toX(evo); const y = toY(vis);
+    ctx.fillStyle = '#2563eb'; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle='#111'; ctx.fillText(c.name, x+8, y+4);
+  });
+  // draw links
+  ctx.strokeStyle = '#999'; wizardNeedCapLinks.forEach(l => {
+    const needEl = Array.from(($('wizNeedsList')?.children||[])).find(li => li.dataset.name === l.need);
+    const cap = wizardCapabilities.find(c=>c.name===l.capability);
+    if (!needEl || !cap) return;
+    const nx = 60 + Array.from($('wizNeedsList').children).indexOf(needEl)*140;
+    const ny = 70;
+    const cx = toX(stageToEvolution(cap.stage||3)); const cy = toY(0.6);
+    ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(cx, cy); ctx.stroke();
+  });
+}
+
+
 
 function parseJsonField(id, fallback) {
   try { const v = $(id).value.trim(); if (!v) return fallback; return JSON.parse(v); } catch { alert(`Invalid JSON in ${id}`); throw new Error('parse'); }
@@ -483,20 +655,29 @@ function parseJsonField(id, fallback) {
 
 async function aiSuggestCapabilities() {
   try {
-    const needs = parseJsonField('wizNeeds', []);
+    const needs = getWizardNeeds();
+    const context = $('wizCapsContext')?.value?.trim() || '';
     const res = await fetch(API + '/ai/wizard/capabilities', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ needs, context }) });
     const data = await res.json(); if (!res.ok) return alert('AI failed: ' + (data.error||''));
-    $('wizCaps').value = JSON.stringify(data, null, 2);
+    // data: { capabilities:[{name}], links:[{need,capability}] }
+    wizardNeedCapLinks = data.links || [];
+    setWizardCapabilities(data.capabilities || []);
+    renderWizardLinks();
   } catch (e) { /* handled */ }
 }
 
 async function aiSuggestEvolution() {
   try {
-    const caps = parseJsonField('wizCaps', {capabilities:[]});
-    const capabilities = caps.capabilities || [];
+    const capabilities = getWizardCapabilities().map(c => ({ name: c.name }));
+    const context = $('wizEvoContext')?.value?.trim() || '';
     const res = await fetch(API + '/ai/wizard/evolution', { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify({ capabilities, context }) });
     const data = await res.json(); if (!res.ok) return alert('AI failed: ' + (data.error||''));
-    $('wizStages').value = JSON.stringify(data, null, 2);
+    // data: [{name, stage, rationale}]
+    const byName = new Map((data||[]).map(x => [x.name, x]));
+    wizardCapabilities.forEach(c => {
+      const s = byName.get(c.name); if (s) { c.stage = s.stage || c.stage; c.rationale = s.rationale || c.rationale; }
+    });
+    renderWizardCapabilities();
   } catch (e) { /* handled */ }
 }
 
@@ -516,11 +697,19 @@ async function createMapFromWizard() {
     const map = await res.json(); if (!res.ok) return alert('Create map failed');
     const mapId = map.id; currentMapId = mapId;
 
-    const users = parseJsonField('wizUsers', []);
-    const needs = parseJsonField('wizNeeds', []);
-    const capObj = parseJsonField('wizCaps', {capabilities:[],links:[]});
-    const caps = capObj.capabilities || [];
-    const needCapLinks = capObj.links || [];
+    const users = getWizardUsers();
+    const needs = getWizardNeeds();
+    // validation: every need must have a forUser present in users
+    for (const n of needs) {
+      if (!n.forUser || !users.includes(n.forUser)) {
+        return alert(`Each need must specify an existing user. Issue with need: ${n.name}`);
+      }
+    }
+    if (!users.length) return alert('Please add at least one User');
+    if (!needs.length) return alert('Please add at least one Need');
+    const caps = getWizardCapabilities();
+    if (!caps.length) return alert('Please add at least one Capability');
+    const needCapLinks = wizardNeedCapLinks || [];
     const stages = parseJsonField('wizStages', []);
     const deltas = parseJsonField('wizDeltas', []);
     const stageByName = new Map(stages.map(x => [x.name, x.stage]));
@@ -542,10 +731,14 @@ async function createMapFromWizard() {
       }
     }
     for (const c of caps) {
-      const st = stageByName.get(c.name);
+      const st = stageByName.get(c.name) || c.stage;
       const evo = st ? stageToEvolution(st) : 0.5;
       const dv = deltaByName.get(c.name) || {};
       const body = { name: c.name, kind:'capability', evolution: evo, visibility: 0.6 };
+      // also include any deltas set in the wizardCapabilities
+      const local = wizardCapabilities.find(x => x.name === c.name) || {};
+      if (local.delta_evolution != null) body.delta_evolution = local.delta_evolution;
+      if (local.delta_visibility != null) body.delta_visibility = local.delta_visibility;
       if (dv.de !== undefined) body.delta_evolution = dv.de;
       if (dv.dv !== undefined) body.delta_visibility = dv.dv;
       const r = await fetch(API + `/maps/${mapId}/components`, { method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token') }, body: JSON.stringify(body) });
