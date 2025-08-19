@@ -142,6 +142,23 @@ app.post('/maps', authenticateToken, async (req, res) => {
   res.status(201).json(ins.rows[0]);
 });
 
+// Update map (rename/description)
+app.patch('/maps/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { name, description } = req.body || {};
+  const map = await db.query('SELECT id FROM maps WHERE id=$1 AND user_id=$2', [id, req.user.id]);
+  if (!map.rows.length) return res.sendStatus(404);
+  const fields = [];
+  const vals = [];
+  if (name !== undefined) { fields.push('name'); vals.push(name.toString()); }
+  if (description !== undefined) { fields.push('description'); vals.push(description === null ? null : description.toString()); }
+  if (!fields.length) return res.status(400).json({ error: 'no fields to update' });
+  const setClause = fields.map((f,i)=> `${f}=$${i+1}`).join(', ');
+  vals.push(id);
+  const upd = await db.query(`UPDATE maps SET ${setClause}, updated_at=NOW() WHERE id=$${vals.length} RETURNING id, name, description, updated_at`, vals);
+  res.json(upd.rows[0]);
+});
+
 
 app.get('/maps/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
